@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import type { Route } from "next";
 
 // Extract correct types from Database definition
 export type UserRole = Database["public"]["Enums"]["user_role"];
@@ -38,9 +39,9 @@ export async function getSession(): Promise<AuthSession> {
     throw new Error("Profile not found");
   }
 
-  return { 
-    user, 
-    profile: profile as Profile 
+  return {
+    user,
+    profile: profile as Profile
   };
 }
 
@@ -59,7 +60,9 @@ export async function getSessionSafe(): Promise<AuthSession | null> {
 /**
  * Role-aware redirect path helper.
  */
-export function getRoleRedirect(role: UserRole): string {
+
+
+export function getRoleRedirect(role: UserRole): Route {
   switch (role) {
     case "administrator":
     case "manager":
