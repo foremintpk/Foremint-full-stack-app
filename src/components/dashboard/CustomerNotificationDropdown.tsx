@@ -1,5 +1,5 @@
 'use client';
-
+import type { Route } from "next";
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -61,7 +61,7 @@ export function CustomerNotificationDropdown({
       const res = await fetch('/api/dashboard/notifications');
       if (!res.ok) throw new Error('Failed to fetch notifications');
       const data = await res.json();
-      
+
       const unreadItems = data.items.filter((n: CustomerNotification) => !n.isRead);
       const unreadCount = unreadItems.length;
       setNotifications(unreadItems);
@@ -105,7 +105,7 @@ export function CustomerNotificationDropdown({
       // Clear local notifications once they are read
       setNotifications([]);
       setBadgeCount(0);
-      
+
       setCustomerNotifCache({
         fetchedAt: Date.now(),
         count: 0,
@@ -155,7 +155,7 @@ export function CustomerNotificationDropdown({
     }
 
     if (notif.link) {
-      router.push(notif.link);
+      router.push(notif.link as Route);
     }
   };
 
@@ -210,9 +210,8 @@ export function CustomerNotificationDropdown({
                 <button
                   key={notif.id}
                   onClick={() => handleNotifClick(notif)}
-                  className={`w-full text-left px-4 py-3.5 hover:bg-gray-50/70 transition-colors block border-l-2 border-transparent hover:border-[#34088f] ${
-                    !notif.isRead ? 'bg-purple-50/30 font-semibold' : ''
-                  }`}
+                  className={`w-full text-left px-4 py-3.5 hover:bg-gray-50/70 transition-colors block border-l-2 border-transparent hover:border-[#34088f] ${!notif.isRead ? 'bg-purple-50/30 font-semibold' : ''
+                    }`}
                 >
                   <p className="text-xs font-bold text-black font-manrope leading-tight">
                     {notif.title || 'Notification'}

@@ -9,7 +9,7 @@
  */
 
 'use client';
-
+import type { Route } from "next";
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -74,7 +74,7 @@ export function NotificationDropdown({
       const res = await fetch('/api/admin/notifications');
       if (!res.ok) throw new Error('Failed to fetch notifications');
       const data = await res.json();
-      
+
       const unreadItems = data.items.filter((item: SafeAdminNotification) => !item.isRead);
       setNotifications(unreadItems);
       setBadgeCount(unreadItems.length);
@@ -121,7 +121,7 @@ export function NotificationDropdown({
       // Clear local states
       setNotifications([]);
       setBadgeCount(0);
-      
+
       // Update local storage/session storage cache
       setNotifCache({
         fetchedAt: Date.now(),
@@ -165,7 +165,7 @@ export function NotificationDropdown({
     }
 
     if (notif.link) {
-      router.push(notif.link);
+      router.push(notif.link as Route);
     }
   };
 
