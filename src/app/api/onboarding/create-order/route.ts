@@ -209,7 +209,7 @@ export async function POST(
       if ('error' in usageResult) {
         console.error('Failed to record coupon usage:', usageResult.error)
       } else {
-        revalidateTag('coupons')
+        revalidateTag('coupons', 'max')
       }
     }
 
@@ -257,14 +257,14 @@ export async function POST(
       console.error('Admin notification insert failed:', notifError)
     }
 
-    revalidateTag(`customer-dashboard-${userId}`)
-    revalidateTag(`notif-list-${userId}`)
-    revalidateTag(`order-list-${userId}`)
-    revalidateTag(`llc-detail-${order.id}`)
-    revalidateTag(`order-${order.id}`)
-    revalidateTag('notif-count-admin')
-    revalidateTag('notif-list-admin')
-    revalidateTag('overview-stats')
+    revalidateTag(`customer-dashboard-${userId}`, 'max')
+    revalidateTag(`notif-list-${userId}`, 'max')
+    revalidateTag(`order-list-${userId}`, 'max')
+    revalidateTag(`llc-detail-${order.id}`, 'max')
+    revalidateTag(`order-${order.id}`, 'max')
+    revalidateTag('notif-count-admin', 'max')
+    revalidateTag('notif-list-admin', 'max')
+    revalidateTag('overview-stats', 'max')
 
     const orderDate = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
