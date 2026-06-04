@@ -19,9 +19,9 @@ export const metadata: Metadata = {
   title: { default: "Foremint", template: "%s | Foremint" },
   description: "LLC formation and business management platform",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
   },
 };
 

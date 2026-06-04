@@ -6,6 +6,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateOrder } from './revalidateOrder';
 
 interface AddInternalAddonParams {
@@ -55,7 +56,7 @@ export async function addInternalAddon({
     }
 
     // 3. Log into audit logs
-    const { error: auditError } = await supabase
+    const { error: auditError } = await createAdminClient()
       .from('audit_logs')
       .insert({
         actor_id: adminId,

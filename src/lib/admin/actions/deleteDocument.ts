@@ -8,6 +8,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateTag } from 'next/cache';
 
 export async function deleteDocument(
@@ -36,7 +37,7 @@ export async function deleteDocument(
     }
 
     // 2. Write to audit_logs to preserve old URL and audit records
-    const { error: auditError } = await supabase
+    const { error: auditError } = await createAdminClient()
       .from('audit_logs')
       .insert({
         actor_id: adminId,
@@ -86,7 +87,7 @@ export async function deleteDocument(
     }
 
     // 5. Invalidate relevant caches
-    (revalidateTag as any)(`order-${orderId}`);
+    revalidateTag(`order-${orderId}`, 'max');
 
     return { success: true };
   } catch (err: any) {

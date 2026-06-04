@@ -14,6 +14,8 @@ import LlcListControls from './_components/LlcListControls';
 import LlcOrderTable from './_components/LlcOrderTable';
 import LlcEmptyState from './_components/LlcEmptyState';
 import LlcPagination from './_components/LlcPagination';
+import LlcContentArea from './_components/LlcContentArea';
+import { LlcNavigationProvider } from '@/context/llc-navigation-context';
 import { LlcListFilters, LlcOrderStatus, DateRangeFilter, LlcSortField, SortDirection } from '@/types/admin';
 
 export const revalidate = 60; // Cache listings at route level for up to 60s
@@ -105,38 +107,39 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
  getLlcOrderStats(dateFilter),
  ]);
 
- return (
- <div className="space-y-6 font-inter">
- {/* Title & Subtitle Section */}
- <div className="flex flex-col gap-1">
- <h1 className="text-2xl font-bold text-black font-manrope">
- LLC Registrations
- </h1>
- <p className="text-xs font-semibold text-gray-500 font-inter">
- {stats.total} total orders
- </p>
- </div>
+  return (
+    <LlcNavigationProvider>
+      <div className="space-y-6 font-inter">
+        {/* Title & Subtitle */}
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-black font-manrope">LLC Registrations</h1>
+          <p className="text-xs font-semibold text-gray-500 font-inter">
+            {stats.total} total orders
+          </p>
+        </div>
 
- {/* Top summary filter badging */}
- <LlcListTopStats stats={stats} activeStatus={status} filters={filters} />
+        {/* Status filter pills — All / Pending / Processing / Formed */}
+        <LlcListTopStats stats={stats} activeStatus={status} filters={filters} />
 
- {/* Filtering, Search and Sort controls */}
- <LlcListControls filters={filters} />
+        {/* Search, date filter, sort, page-size controls */}
+        <LlcListControls filters={filters} />
 
- {/* Orders grid table or responsive stack rendering */}
- {listResult.orders.length > 0 ? (
- <LlcOrderTable orders={listResult.orders} />
- ) : (
- <LlcEmptyState filters={filters} isTotalZero={stats.total === 0} />
- )}
+        {/* Table + pagination wrapped in the loading overlay */}
+        <LlcContentArea>
+          {listResult.orders.length > 0 ? (
+            <LlcOrderTable orders={listResult.orders} />
+          ) : (
+            <LlcEmptyState filters={filters} isTotalZero={stats.total === 0} />
+          )}
 
- {/* Pagination Coordinator */}
- <LlcPagination
- totalCount={listResult.totalCount}
- totalPages={listResult.totalPages}
- currentPage={filters.page}
- pageSize={filters.pageSize}
- />
- </div>
- );
+          <LlcPagination
+            totalCount={listResult.totalCount}
+            totalPages={listResult.totalPages}
+            currentPage={filters.page}
+            pageSize={filters.pageSize}
+          />
+        </LlcContentArea>
+      </div>
+    </LlcNavigationProvider>
+  );
 }

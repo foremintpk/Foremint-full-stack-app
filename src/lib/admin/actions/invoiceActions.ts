@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidateTag, revalidatePath } from 'next/cache';
 
 // Typecast cache revalidation methods for Next.js compiler compatibility
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: 'layout' | 'page') => void;
 
 async function verifyRole(allowedRoles: ('administrator' | 'manager')[]) {
@@ -68,7 +67,7 @@ export async function createInvoice(formData: FormData): Promise<{ error?: strin
     }
 
     // Revalidate cache
-    revalidateTagTyped('invoice-list');
+    revalidateTag('invoice-list', 'max');
     revalidatePathTyped('/admin/invoices', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -120,7 +119,7 @@ export async function updateInvoice(id: string, formData: FormData): Promise<{ e
     }
 
     // Revalidate cache
-    revalidateTagTyped('invoice-list');
+    revalidateTag('invoice-list', 'max');
     revalidatePathTyped('/admin/invoices', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -146,7 +145,7 @@ export async function deleteInvoice(id: string): Promise<{ error?: string }> {
     }
 
     // Revalidate cache
-    revalidateTagTyped('invoice-list');
+    revalidateTag('invoice-list', 'max');
     revalidatePathTyped('/admin/invoices', 'page');
     revalidatePathTyped('/admin', 'layout');
 

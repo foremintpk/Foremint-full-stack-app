@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { v2 as cloudinary } from 'cloudinary';
 import { revalidateOrder } from '@/lib/admin/actions/revalidateOrder';
 
@@ -88,13 +89,19 @@ export async function POST(
 
     // 4. Hybrid Routing Rule: > 100KB -> Cloudinary; <= 100KB -> Supabase Storage
     if (file.size > 100000) {
-      // Cloudinary
       storageType = 'cloudinary';
+      const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      // PDFs → resource_type:'raw' preserves the file as-is so browsers receive
+      // actual PDF bytes. Keep the full filename (including .pdf) as the public_id
+      // so Cloudinary includes the extension in the delivery URL and serves
+      // Content-Type: application/pdf. Images use 'auto' with no extension.
       const uploadResult: any = await new Promise((resolve, reject) => {
         cloudinary.uploader.upload_stream({
           folder: `foremint/orders/${orderId}`,
-          public_id: `${timestamp}-${sanitizedFileName.split('.')[0]}`,
-          resource_type: 'auto',
+          public_id: isPdfFile
+            ? `${timestamp}-${sanitizedFileName}`
+            : `${timestamp}-${sanitizedFileName.split('.')[0]}`,
+          resource_type: isPdfFile ? 'raw' : 'auto',
         }, (error, result) => {
           if (error) reject(error);
           else resolve(result);
@@ -109,7 +116,7 @@ export async function POST(
       const bucketName = 'onboarding-documents';
       const path = `${orderId}/internal_ops/${uniqueFileName}`;
 
-      const { data, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(path, buffer, {
           contentType: file.type,
@@ -153,12 +160,18 @@ export async function POST(
     if (slotKey === 'payment_receipt') docType = 'payment_receipt';
 
     // 6. Insert new document record
+    const cloudinaryResourceType =
+      storageType === 'cloudinary'
+        ? (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? 'raw' : 'image')
+        : null;
+
     const { data: docRecord, error: insertError } = await (supabase as any)
       .from('documents')
       .insert({
         profile_id: order.user_id,
         document_type: docType,
         storage_type: storageType,
+        cloudinary_resource_type: cloudinaryResourceType,
         file_name: file.name,
         file_size: file.size,
         mime_type: file.type,
@@ -178,7 +191,7 @@ export async function POST(
 
     // 7. Write to audit_logs
     if (adminId && UUID_REGEX.test(adminId)) {
-      await supabase.from('audit_logs').insert({
+      await createAdminClient().from('audit_logs').insert({
         actor_id: adminId,
         action: 'upload_document',
         entity_type: 'document',

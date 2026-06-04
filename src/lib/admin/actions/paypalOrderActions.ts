@@ -5,7 +5,6 @@ import { revalidateTag, revalidatePath } from 'next/cache';
 import { PaypalOrderStatus, PaypalOrderType } from '@/types/admin';
 
 // Typecast cache revalidation methods for Next.js 16 compiler compatibility
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: 'layout' | 'page') => void;
 
 async function verifyRole(allowedRoles: ('administrator' | 'manager')[]) {
@@ -66,7 +65,7 @@ export async function createPaypalOrder(formData: FormData): Promise<{ error?: s
     }
 
     // Revalidate
-    revalidateTagTyped('paypal-orders');
+    revalidateTag('paypal-orders', 'max');
     revalidatePathTyped('/admin/paypal-accounts', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -116,7 +115,7 @@ export async function updatePaypalOrder(id: string, formData: FormData): Promise
     }
 
     // Revalidate
-    revalidateTagTyped('paypal-orders');
+    revalidateTag('paypal-orders', 'max');
     revalidatePathTyped('/admin/paypal-accounts', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -141,7 +140,7 @@ export async function deletePaypalOrder(id: string): Promise<{ error?: string }>
     }
 
     // Revalidate
-    revalidateTagTyped('paypal-orders');
+    revalidateTag('paypal-orders', 'max');
     revalidatePathTyped('/admin/paypal-accounts', 'page');
     revalidatePathTyped('/admin', 'layout');
 

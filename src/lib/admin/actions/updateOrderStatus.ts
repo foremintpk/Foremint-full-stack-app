@@ -8,7 +8,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { revalidateTag } from 'next/cache';
+import { revalidateTag, revalidatePath } from 'next/cache';
 
 export async function updateOrderStatus(
   orderId: string,
@@ -38,11 +38,18 @@ export async function updateOrderStatus(
 
     const oldStatus = order.status;
 
+    // Map UI-friendly aliases to actual DB enum values
+    const STATUS_ALIAS_MAP: Record<string, string> = {
+      processing: 'in_progress',
+      formed:     'completed',
+    };
+    const dbStatus = STATUS_ALIAS_MAP[newStatus] ?? newStatus;
+
     // 2. Perform the order status update
     const { error: updateError } = await (supabase as any)
       .from('orders')
       .update({
-        status: newStatus,
+        status: dbStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);
@@ -58,8 +65,8 @@ export async function updateOrderStatus(
         order_id: orderId,
         changed_by: adminId,
         old_status: oldStatus,
-        new_status: newStatus,
-        note: note || `Status updated to ${newStatus} by admin.`,
+        new_status: dbStatus,
+        note: note || `Status updated to ${dbStatus} by admin.`,
         changed_at: new Date().toISOString(),
       });
 
@@ -68,9 +75,11 @@ export async function updateOrderStatus(
     }
 
     // 4. Invalidate relevant caches to trigger instant UI refresh
-    (revalidateTag as any)(`order-${orderId}`);
-    (revalidateTag as any)('order-list-llc');
-    (revalidateTag as any)('order-list-llc-stats');
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag('order-list-llc', 'max');
+    revalidateTag('order-list-llc-stats', 'max');
+    revalidatePath('/admin/llc-registrations', 'layout');
+    revalidatePath(`/admin/llc-registrations/${orderId}`, 'layout');
 
     return { success: true };
   } catch (err: any) {

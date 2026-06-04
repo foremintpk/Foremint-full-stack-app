@@ -76,7 +76,7 @@ export async function updateCustomerProfile(
       return { success: false, error: error.message };
     }
 
-    revalidateTag(`customer-dashboard-${userId}`);
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Unexpected error' };
@@ -295,10 +295,10 @@ export async function submitDocumentProof(
     });
 
     // 5. Invalidate caches
-    revalidateTag(`order-${orderId}`);
-    revalidateTag(`llc-detail-${orderId}`);
-    revalidateTag(`customer-dashboard-${userId}`);
-    revalidateTag('notif-list-admin');
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag(`llc-detail-${orderId}`, 'max');
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
+    revalidateTag('notif-list-admin', 'max');
 
     return { success: true };
   } catch (err: any) {
@@ -382,10 +382,10 @@ export async function submitBankTransferReceipt(
     });
 
     // 5. Invalidate caches
-    revalidateTag(`order-${orderId}`);
-    revalidateTag(`llc-detail-${orderId}`);
-    revalidateTag(`customer-dashboard-${userId}`);
-    revalidateTag('notif-list-admin');
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag(`llc-detail-${orderId}`, 'max');
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
+    revalidateTag('notif-list-admin', 'max');
 
     return { success: true };
   } catch (err: any) {
@@ -414,15 +414,11 @@ export async function simulateStripePayment(
       return { success: false, error: 'Unauthorized or invalid order' };
     }
 
-    const oldStatus = order.status;
-    const newStatus = oldStatus === 'pending' || oldStatus === 'awaiting_payment' ? 'confirmed' : oldStatus;
-
-    // 1. Update payment status to paid
+    // 1. Update payment status to paid only — order status is admin-controlled
     const { error: updateErr } = await supabase
       .from('orders')
       .update({
         payment_status: 'paid',
-        status: newStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);
@@ -430,16 +426,6 @@ export async function simulateStripePayment(
     if (updateErr) {
       return { success: false, error: updateErr.message };
     }
-
-    // 2. Insert status history
-    await supabase.from('order_status_history').insert({
-      order_id: orderId,
-      changed_by: userId,
-      old_status: oldStatus,
-      new_status: newStatus,
-      note: 'Simulated credit card checkout (Stripe gateway simulated). Payment confirmed.',
-      changed_at: new Date().toISOString(),
-    });
 
     // 3. Send admin notification
     const clientName = session.profile.full_name || session.profile.email;
@@ -453,10 +439,10 @@ export async function simulateStripePayment(
     });
 
     // 4. Invalidate caches
-    revalidateTag(`order-${orderId}`);
-    revalidateTag(`llc-detail-${orderId}`);
-    revalidateTag(`customer-dashboard-${userId}`);
-    revalidateTag('notif-list-admin');
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag(`llc-detail-${orderId}`, 'max');
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
+    revalidateTag('notif-list-admin', 'max');
 
     return { success: true };
   } catch (err: any) {
@@ -483,8 +469,8 @@ export async function markCustomerNotificationsRead(
       .eq('recipient_id', userId)
       .eq('is_read', false);
 
-    revalidateTag(`customer-dashboard-${userId}`);
-    revalidateTag(`notif-list-${userId}`);
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
+    revalidateTag(`notif-list-${userId}`, 'max');
 
     return { success: true };
   } catch (err: any) {
@@ -550,7 +536,7 @@ export async function createSupportQuery(
       is_read: false,
     });
 
-    revalidateTag(`customer-dashboard-${userId}`);
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
     return { success: true, queryId: query.id };
   } catch (err: any) {
     return { success: false, error: err.message || 'Unexpected exception' };
@@ -615,7 +601,7 @@ export async function sendSupportMessage(
       is_read: false,
     });
 
-    revalidateTag(`customer-dashboard-${userId}`);
+    revalidateTag(`customer-dashboard-${userId}`, 'max');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Unexpected exception' };

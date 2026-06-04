@@ -30,7 +30,7 @@ export async function GET() {
     }
 
     // Fetch dashboard data (which includes notifications list)
-    const dashboardData = await getDashboardData(user.id, profile.full_name || '', profile.email || '');
+    const dashboardData = await getDashboardData(user.id, profile.full_name || '');
 
     const unreadNotifications = dashboardData.notifications.filter((n) => !n.isRead);
 

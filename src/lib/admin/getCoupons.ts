@@ -1,7 +1,24 @@
 import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import type { Coupon, CouponUsage } from '@/types/admin'
+import type { Database } from '@/types/database'
+import type { Coupon, CouponUsage, CouponDiscountType, CouponStatus } from '@/types/admin'
+
+type CouponRow = Database['public']['Tables']['coupons']['Row']
+
+type CouponUsageQueryRow = Database['public']['Tables']['coupon_usages']['Row'] & {
+  coupons?: {
+    name: string | null
+    code: string | null
+  } | null
+  profiles?: {
+    full_name: string | null
+    email: string | null
+  } | null
+  orders?: {
+    order_number: string | null
+  } | null
+}
 
 export interface CouponsDashboardData {
   coupons: Coupon[]
@@ -15,6 +32,7 @@ async function fetchCouponsQuery(
     supabase
       .from('coupons')
       .select('*')
+      .neq('status', 'deleted')
       .order('created_at', { ascending: false }),
     supabase
       .from('coupon_usages')
@@ -40,21 +58,21 @@ async function fetchCouponsQuery(
       .order('used_at', { ascending: false }),
   ])
 
-  const coupons: Coupon[] = (couponsRes.data ?? []).map((row: any) => ({
+  const coupons: Coupon[] = (couponsRes.data ?? []).map((row: CouponRow) => ({
     id: row.id,
     name: row.name,
     code: row.code,
-    discountType: row.discount_type,
+    discountType: row.discount_type as CouponDiscountType,
     discountValue: Number(row.discount_value || 0),
     totalUses: Number(row.total_uses || 0),
     usedCount: Number(row.used_count || 0),
     perUserUses: Number(row.per_user_uses || 0),
-    status: row.status,
+    status: row.status as CouponStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }))
 
-  const usages: CouponUsage[] = (usagesRes.data ?? []).map((row: any) => ({
+  const usages: CouponUsage[] = (usagesRes.data ?? []).map((row: CouponUsageQueryRow) => ({
     id: row.id,
     couponId: row.coupon_id,
     couponName: row.coupons?.name || 'Coupon',

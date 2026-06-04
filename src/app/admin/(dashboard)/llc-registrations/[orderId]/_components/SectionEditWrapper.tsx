@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { Pencil, Save, X, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 interface SectionEditWrapperProps {
   sectionTitle: string;
@@ -22,6 +22,7 @@ export function SectionEditWrapper({
   children,
   onCancel,
 }: SectionEditWrapperProps): React.JSX.Element {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export function SectionEditWrapper({
       const res = await onSave();
       if (res.success) {
         setIsEditing(false);
+        router.refresh();
       } else {
         setSaveError(res.error || 'Failed to save changes');
       }

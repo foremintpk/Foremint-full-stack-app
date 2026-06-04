@@ -1,9 +1,9 @@
+import { cache } from 'react';
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type { Route } from "next";
 
-// Extract correct types from Database definition
 export type UserRole = Database["public"]["Enums"]["user_role"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -16,7 +16,7 @@ export type AuthSession = {
  * Returns the authenticated user + their profile row.
  * Throws if unauthenticated — use only behind protected routes.
  */
-export async function getSession(): Promise<AuthSession> {
+const getSessionImpl = async (): Promise<AuthSession> => {
   const supabase = await createClient();
 
   const {
@@ -28,7 +28,6 @@ export async function getSession(): Promise<AuthSession> {
     throw new Error("Unauthenticated");
   }
 
-  // Use the Database types to ensure .role and other fields are correctly typed
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("*")
@@ -43,7 +42,9 @@ export async function getSession(): Promise<AuthSession> {
     user,
     profile: profile as Profile
   };
-}
+};
+
+export const getSession = cache(getSessionImpl);
 
 /**
  * Safe version — returns null instead of throwing.
@@ -60,8 +61,6 @@ export async function getSessionSafe(): Promise<AuthSession | null> {
 /**
  * Role-aware redirect path helper.
  */
-
-
 export function getRoleRedirect(role: UserRole): Route {
   switch (role) {
     case "administrator":

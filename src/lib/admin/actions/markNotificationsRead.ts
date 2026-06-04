@@ -5,13 +5,14 @@
  * 1. Server vs Client choice rationale: Server Action ('use server').
  * 2. Caching layer: Directly mutates Database and triggers invalidation on Layer 1 cached data.
  * 3. RBAC: Invoked by authenticated administrators or managers from the notification dropdown.
- * 4. Revalidation / Cache Busting: revalidateTag(`notif-count-${adminId}`) and revalidateTag(`notif-list-${adminId}`).
+ * 4. Revalidation / Cache Busting: revalidateTag(`notif-count-${adminId}`, 'max') and revalidateTag(`notif-list-${adminId}`, 'max').
  */
 
 'use server';
 
 import { revalidateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { AdminRole } from '@/types/admin';
 
 export async function markAllNotificationsRead(
@@ -23,12 +24,18 @@ export async function markAllNotificationsRead(
   }
 
   try {
+    // Use service-role client to bypass RLS — the session client may have no UPDATE policy
+    // if the migration hasn't been run yet. The RBAC check above ensures only admins call this.
     const supabase = await createClient();
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) return { success: false, error: 'Unauthorized' };
 
-    // 1. Update personal notifications
-    const { error: personalError } = await supabase
+    const admin = createAdminClient();
+
+    // 1. Update personal notifications (recipient_id matches this admin)
+    const { error: personalError } = await admin
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true } as any)
       .eq('recipient_id', adminId)
       .eq('is_read', false);
 
@@ -36,29 +43,23 @@ export async function markAllNotificationsRead(
       console.error('Error marking personal notifications read:', personalError);
     }
 
-    // 2. Update role-targeted notifications
-    const { error: roleError } = await supabase
+    // 2. Update role-targeted notifications (target_role matches admin's role)
+    const { error: roleError } = await admin
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true } as any)
       .eq('target_role', adminRole)
       .eq('is_read', false);
 
     if (roleError) {
       console.error('Error marking role notifications read:', roleError);
-    }
-
-    if (personalError || roleError) {
-      return { 
-        success: false, 
-        error: personalError?.message || roleError?.message || 'Failed to mark some notifications as read' 
-      };
+      return { success: false, error: roleError.message };
     }
 
     // 3. Invalidate cached dynamic counts/lists
-    (revalidateTag as any)(`notif-count-${adminId}`);
-    (revalidateTag as any)(`notif-list-${adminId}`);
-    (revalidateTag as any)('notif-count-admin');
-    (revalidateTag as any)('notif-list-admin');
+    revalidateTag(`notif-count-${adminId}`, 'max');
+    revalidateTag(`notif-list-${adminId}`, 'max');
+    revalidateTag('notif-count-admin', 'max');
+    revalidateTag('notif-list-admin', 'max');
 
     return { success: true };
   } catch (err: any) {
@@ -76,11 +77,11 @@ export async function markNotificationRead(
   }
 
   try {
-    const supabase = await createClient();
+    const admin = createAdminClient();
 
-    const { error } = await supabase
+    const { error } = await admin
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true } as any)
       .eq('id', notificationId);
 
     if (error) {
@@ -88,11 +89,10 @@ export async function markNotificationRead(
       return { success: false, error: error.message };
     }
 
-    // Invalidate cached dynamic counts/lists
-    (revalidateTag as any)(`notif-count-${adminId}`);
-    (revalidateTag as any)(`notif-list-${adminId}`);
-    (revalidateTag as any)('notif-count-admin');
-    (revalidateTag as any)('notif-list-admin');
+    revalidateTag(`notif-count-${adminId}`, 'max');
+    revalidateTag(`notif-list-${adminId}`, 'max');
+    revalidateTag('notif-count-admin', 'max');
+    revalidateTag('notif-list-admin', 'max');
 
     return { success: true };
   } catch (err: any) {

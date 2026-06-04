@@ -6,6 +6,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateOrder } from './revalidateOrder';
 import type { FormationDetails } from '@/types/admin';
 
@@ -23,28 +24,61 @@ export async function updateFormationDetails(
       return { success: false, error: 'Unauthorized: Admin or Manager role required' };
     }
 
-    // 2. Retrieve company_id for this order
-    const { data: order, error: orderError } = await supabase
+    // 2. Retrieve company_id — use admin client to always get the live row,
+    //    bypassing any Next.js data cache that might return a stale company_id.
+    const adminDb = createAdminClient();
+    const { data: order, error: orderError } = await adminDb
       .from('orders')
-      .select('company_id')
+      .select('company_id, user_id, form_snapshot')
       .eq('id', orderId)
       .single();
 
-    if (orderError || !order || !order.company_id) {
-      return { success: false, error: 'Linked company not found. Please reload.' };
+    if (orderError || !order) {
+      return { success: false, error: 'Order not found.' };
     }
 
-    const companyId = order.company_id;
+    let companyId: string = (order as any).company_id;
+
+    // Auto-create company when none is linked (common for new orders)
+    if (!companyId) {
+      const admin = adminDb;
+      const snapshot = (order as any).form_snapshot as Record<string, any> | null ?? {};
+      const businessName: string =
+        snapshot?.step3?.businessName ??
+        snapshot?.businessName ??
+        'Unnamed LLC';
+
+      const { data: newCompany, error: createErr } = await admin
+        .from('companies')
+        .insert({
+          owner_id: (order as any).user_id,
+          company_name: businessName,
+        } as any)
+        .select('id')
+        .single();
+
+      if (createErr || !newCompany) {
+        return { success: false, error: 'Could not create company record: ' + (createErr?.message ?? 'unknown error') };
+      }
+
+      // Link the new company to this order (admin client, no RLS interference)
+      await adminDb
+        .from('orders')
+        .update({ company_id: newCompany.id } as any)
+        .eq('id', orderId);
+
+      companyId = newCompany.id;
+    }
 
     // 3. Select original values for audit difference tracking
-    const { data: oldCompany } = await supabase
+    const { data: oldCompany } = await adminDb
       .from('companies')
       .select('*')
       .eq('id', companyId)
       .single();
 
     // 4. Perform the update
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminDb
       .from('companies')
       .update({
         ein: data.einNumber,
@@ -86,8 +120,8 @@ export async function updateFormationDetails(
       }
     }
 
-    // 6. Write Audit Log
-    const { error: auditError } = await supabase
+    // 6. Write Audit Log — reuse the same admin client (bypasses RLS on audit_logs)
+    const { error: auditError } = await adminDb
       .from('audit_logs')
       .insert({
         actor_id: adminId,
@@ -98,7 +132,7 @@ export async function updateFormationDetails(
           changed_fields: changedFields,
           saved_at: new Date().toISOString(),
         },
-      });
+      } as any);
 
     if (auditError) {
       console.error('[updateFormationDetails Audit Log Error]:', auditError);

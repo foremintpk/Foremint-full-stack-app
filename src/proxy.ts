@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
 import type { Database } from "@/types/database";
 
-// Correctly extract the role enum type from the Database
 type UserRole = Database["public"]["Enums"]["user_role"];
 
-// ── Route Definitions ────────────────────────────────────────────────────────
-
-/** Routes that bypass all auth checks */
 const PUBLIC_ROUTES = [
   "/",
   "/about",
@@ -18,14 +14,23 @@ const PUBLIC_ROUTES = [
   "/terms",
 ];
 
-/** Routes that require the user to be logged OUT */
-const AUTH_ROUTES = [
+const AUTHENTICATED_ROUTES = [
+  "/company",
+  "/documents",
+  "/orders",
+  "/profile",
+  "/progress",
+  "/settings",
+];
+
+const SERVER_GUARDED_ROUTES = [
+  "/dashboard",
+  "/login",
   "/register",
   "/forgot-password",
   "/reset-password",
+  "/sign-in",
 ];
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function matchesRoute(pathname: string, routes: string[]): boolean {
   return routes.some(
@@ -33,100 +38,136 @@ function matchesRoute(pathname: string, routes: string[]): boolean {
   );
 }
 
-// ── Proxy (formerly Middleware) ───────────────────────────────────────────────
+function isAdminRole(role: UserRole | null): boolean {
+  return role === "administrator" || role === "manager";
+}
 
 /**
  * Next.js 16+ Proxy function.
  * Handles request interception, session refresh, and RBAC.
  */
 export async function proxy(request: NextRequest) {
-  const { supabase, response } = createMiddlewareClient(request);
   const pathname = request.nextUrl.pathname;
+  const isOnboardingRoute = pathname.startsWith("/onboarding");
+  const isDashboardRoute = pathname.startsWith("/dashboard");
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isAuthenticatedRoute = matchesRoute(pathname, AUTHENTICATED_ROUTES);
+  const isServerGuardedRoute = matchesRoute(pathname, SERVER_GUARDED_ROUTES);
 
-  // Refresh session — MUST happen before any auth checks
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // 1. Static assets, API routes, and Next internals — skip
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/auth/") ||
     /\.\w+$/.test(pathname)
   ) {
-    return response;
+    return NextResponse.next({ request });
   }
 
-  // 2. Public routes — always accessible
   if (matchesRoute(pathname, PUBLIC_ROUTES)) {
-    return response;
+    return NextResponse.next({ request });
   }
 
-  // Fetch user role from profiles using the typed Supabase client
-  let userRole: UserRole | null = null;
-  if (user) {
+  if (isServerGuardedRoute) {
+    return NextResponse.next({ request });
+  }
+
+  const { supabase, response } = createMiddlewareClient(request);
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  const authError = error as { code?: string; message?: string } | null;
+  if (
+    authError &&
+    (authError.code === "refresh_token_not_found" ||
+      authError.message?.includes("Refresh Token") ||
+      authError.message?.includes("refresh_token"))
+  ) {
+    const allCookies = request.cookies.getAll();
+    allCookies.forEach((cookie) => {
+      if (cookie.name.startsWith("sb-")) {
+        request.cookies.delete(cookie.name);
+        response.cookies.set({
+          name: cookie.name,
+          value: "",
+          maxAge: -1,
+          path: "/",
+        });
+      }
+    });
+  }
+
+  const shouldResolveRole = Boolean(user) && (isAdminRoute || isOnboardingRoute);
+  const getUserRole = async (): Promise<UserRole | null> => {
+    if (!user || !shouldResolveRole) {
+      return null;
+    }
+
     const { data: profile } = await (supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle() as unknown as Promise<{ data: { role: UserRole } | null }>);
-    userRole = profile?.role || null;
-  }
+    return profile?.role || null;
+  };
 
-  // 3. Auth routes — redirect authenticated users away (excluding login/sign-in pages)
-  if (matchesRoute(pathname, AUTH_ROUTES)) {
+  if (isOnboardingRoute) {
+    const userRole = await getUserRole();
     if (user && userRole) {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = userRole === "administrator" || userRole === "manager" ? "/admin" : "/dashboard";
-      return NextResponse.redirect(redirectUrl);
-    }
-    return response;
-  }
-
-  // 4. Onboarding Protection — block admins
-  if (pathname.startsWith('/onboarding')) {
-    if (user && userRole) {
-      if (userRole === 'administrator' || userRole === 'manager') {
+      if (isAdminRole(userRole)) {
         const redirectUrl = request.nextUrl.clone();
-        redirectUrl.pathname = '/admin';
-        return NextResponse.redirect(redirectUrl);
+        redirectUrl.pathname = "/admin";
+        const redirectRes = NextResponse.redirect(redirectUrl);
+        response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+        return redirectRes;
       }
     }
     return response;
   }
 
-  // 5. Dashboard Protection — redirect admins to admin, protect customer path, allow incomplete onboarding
-  if (pathname.startsWith('/dashboard')) {
+  if (isDashboardRoute) {
     if (!user) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
-      return NextResponse.redirect(redirectUrl);
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
     }
 
-    if (userRole === 'administrator' || userRole === 'manager') {
-      const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/admin';
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    // Customer gets full access to dashboard regardless of onboarding completion status
     return response;
   }
 
-  // 6. Admin Protection — isolate from customers, require authentication
-  if (pathname.startsWith('/admin')) {
+  if (isAuthenticatedRoute) {
+    if (!user) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/login";
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
+    }
+
+    return response;
+  }
+
+  if (isAdminRoute) {
     if (!user) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(redirectUrl);
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
     }
 
-    if (userRole !== 'administrator' && userRole !== 'manager') {
+    const userRole = await getUserRole();
+    if (!isAdminRole(userRole)) {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = '/dashboard';
-      return NextResponse.redirect(redirectUrl);
+      redirectUrl.pathname = "/dashboard";
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
     }
 
     return response;
@@ -135,18 +176,8 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-// ── Matcher Configuration ───────────────────────────────────────────────────
-
 export const config = {
   matcher: [
-    /*
-     * Match all paths EXCEPT:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico
-     * - sitemap.xml
-     * - robots.txt
-     */
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
   ],
 };

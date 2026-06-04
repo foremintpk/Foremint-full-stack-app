@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag, revalidatePath } from 'next/cache';
 
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 
 export async function createAddon(formData: FormData): Promise<{ error?: string }> {
   try {
@@ -75,7 +74,7 @@ export async function createAddon(formData: FormData): Promise<{ error?: string 
       }
     }
 
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-list', 'max');
     revalidatePath('/admin/addons', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -165,7 +164,7 @@ export async function updateAddon(id: string, formData: FormData): Promise<{ err
       }
     }
 
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-list', 'max');
     revalidatePath('/admin/addons', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -204,7 +203,7 @@ export async function deleteAddon(id: string): Promise<{ error?: string }> {
       return { error: error.message || 'Failed to delete addon' };
     }
 
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-list', 'max');
     revalidatePath('/admin/addons', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -244,8 +243,8 @@ export async function createAddonCategory(formData: FormData): Promise<{ error?:
       return { error: error.message || 'Failed to create category' };
     }
 
-    revalidateTagTyped('addon-categories');
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-categories', 'max');
+    revalidateTag('addon-list', 'max');
 
     return {};
   } catch (err: any) {
@@ -284,8 +283,8 @@ export async function updateAddonCategory(id: string, formData: FormData): Promi
       return { error: error.message || 'Failed to update category' };
     }
 
-    revalidateTagTyped('addon-categories');
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-categories', 'max');
+    revalidateTag('addon-list', 'max');
 
     return {};
   } catch (err: any) {
@@ -321,8 +320,8 @@ export async function deleteAddonCategory(id: string): Promise<{ error?: string 
       return { error: error.message || 'Failed to delete category' };
     }
 
-    revalidateTagTyped('addon-categories');
-    revalidateTagTyped('addon-list');
+    revalidateTag('addon-categories', 'max');
+    revalidateTag('addon-list', 'max');
 
     return {};
   } catch (err: any) {

@@ -1,22 +1,12 @@
-/**
- * @file src/components/admin/NotificationDropdown.tsx
- * @description Beautiful, premium notifications dropdown incorporating a 4-tier caching strategy.
- * 
- * 1. Server vs Client choice rationale: Client Component ("use client") for interactive dropdown state, client-side caching, and fetching.
- * 2. Caching layer: Layer 4 - sessionStorage caching + Stale-While-Revalidate from /api/admin/notifications.
- * 3. RBAC: N/A.
- * 4. Revalidation / Cache Busting: Handled via trigger actions.
- */
-
 'use client';
-import type { Route } from "next";
-import React, { useState, useEffect, useRef } from 'react';
+import type { Route } from 'next';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, Check, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { SafeAdminNotification, AdminRole } from '@/types/admin';
 import {
-  getNotifCache,
+  clearNotifCache,
   setNotifCache,
   setSessionBadgeCount,
   getSessionBadgeCount,
@@ -25,6 +15,8 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/admin/actions/markNotificationsRead';
+
+const POLL_INTERVAL_MS = 45_000; // poll every 45s in the background
 
 interface NotificationDropdownProps {
   adminId: string;
@@ -43,64 +35,71 @@ export function NotificationDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<SafeAdminNotification[]>(() => {
     if (typeof window === 'undefined') return initialNotifications;
-
-    const cached = getNotifCache();
-    return cached ? cached.items.filter((item) => !item.isRead) : initialNotifications;
+    const cachedCount = getSessionBadgeCount();
+    // If we know the badge is 0 (from a previous mark-read in this session), trust it
+    if (cachedCount === 0) return [];
+    return initialNotifications;
   });
   const [badgeCount, setBadgeCount] = useState<number>(() => {
     if (typeof window === 'undefined') return initialNotifications.length;
-
     const cachedCount = getSessionBadgeCount();
     if (cachedCount !== null) return cachedCount;
-
-    const cached = getNotifCache();
-    return cached ? cached.count : initialNotifications.length;
+    return initialNotifications.length;
   });
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fetchingRef = useRef(false);
 
-  // Synchronize state changes to sidebar badge counter
+  // Sync badge count to sidebar and sessionStorage whenever it changes
   useEffect(() => {
-    if (onBadgeCountChange) {
-      onBadgeCountChange(badgeCount);
-    }
+    onBadgeCountChange?.(badgeCount);
     setSessionBadgeCount(badgeCount);
   }, [badgeCount, onBadgeCountChange]);
 
-  // Fetch updated notifications from API route
-  const fetchNotifications = async () => {
-    setLoading(true);
+  // Fetch fresh notifications from the server (bypasses browser cache with no-store header)
+  const fetchNotifications = useCallback(async (silent = false) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    if (!silent) setLoading(true);
     try {
-      const res = await fetch('/api/admin/notifications');
+      const res = await fetch('/api/admin/notifications', { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch notifications');
       const data = await res.json();
 
-      const unreadItems = data.items.filter((item: SafeAdminNotification) => !item.isRead);
-      setNotifications(unreadItems);
-      setBadgeCount(unreadItems.length);
+      const unread: SafeAdminNotification[] = (data.items || []).filter(
+        (item: SafeAdminNotification) => !item.isRead
+      );
+      setNotifications(unread);
+      setBadgeCount(unread.length);
 
-      // Save to sessionStorage cache
-      setNotifCache({
-        fetchedAt: Date.now(),
-        count: unreadItems.length,
-        items: unreadItems,
-      });
+      setNotifCache({ fetchedAt: Date.now(), count: unread.length, items: unread });
     } catch (err) {
       console.error('Error fetching unread notifications:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      fetchingRef.current = false;
     }
-  };
-
-  // Load from sessionStorage cache on component mount and then refresh in background.
-  useEffect(() => {
-    const raf = window.requestAnimationFrame(() => {
-      void fetchNotifications();
-    });
-    return () => window.cancelAnimationFrame(raf);
   }, []);
 
-  // Close dropdown on click outside
+  // Fetch once on mount to get the latest state
+  useEffect(() => {
+    void fetchNotifications(true);
+  }, [fetchNotifications]);
+
+  // Re-fetch every time the dropdown is opened (catches any notifications that arrived since last open)
+  useEffect(() => {
+    if (isOpen) {
+      void fetchNotifications();
+    }
+  }, [isOpen, fetchNotifications]);
+
+  // Background polling — keeps the badge count current even when dropdown is closed
+  useEffect(() => {
+    const id = setInterval(() => void fetchNotifications(true), POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [fetchNotifications]);
+
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -118,51 +117,44 @@ export function NotificationDropdown({
       const result = await markAllNotificationsRead(adminId, adminRole);
       if (!result.success) throw new Error(result.error);
 
-      // Clear local states
+      // Optimistic update — wipe state immediately
       setNotifications([]);
       setBadgeCount(0);
 
-      // Update local storage/session storage cache
-      setNotifCache({
-        fetchedAt: Date.now(),
-        count: 0,
-        items: [],
-      });
+      // Clear ALL client caches so a page refresh also sees 0
+      clearNotifCache();
+      setNotifCache({ fetchedAt: Date.now(), count: 0, items: [] });
 
       toast.success('All notifications marked as read.');
       setIsOpen(false);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to mark notifications read');
+      // Re-fetch to resync state in case of partial failure
+      void fetchNotifications();
     } finally {
       setLoading(false);
     }
   };
 
-  // Click handler on individual notification rows
+  // Handle click on a single notification
   const handleNotifClick = async (notif: SafeAdminNotification) => {
     setIsOpen(false);
 
-    // Remove notification from local view state immediately
+    // Optimistic removal from UI
     setNotifications((prev) => prev.filter((n) => n.id !== notif.id));
     setBadgeCount((prev) => Math.max(0, prev - 1));
 
-    // Update session storage cache
-    const cached = getNotifCache();
-    if (cached) {
-      const updatedItems = cached.items.filter((n) => n.id !== notif.id);
-      setNotifCache({
-        fetchedAt: cached.fetchedAt,
-        count: Math.max(0, cached.count - 1),
-        items: updatedItems,
-      });
-    }
+    // Update sessionStorage cache to reflect removal
+    setNotifCache({
+      fetchedAt: Date.now(),
+      count: Math.max(0, badgeCount - 1),
+      items: notifications.filter((n) => n.id !== notif.id),
+    });
 
-    // Call server action to mark notification as read in Supabase
-    try {
-      await markNotificationRead(notif.id, adminId);
-    } catch (err) {
-      console.error('Failed to mark notification read in database:', err);
-    }
+    // Persist to DB — fire-and-forget, no need to await for UI
+    markNotificationRead(notif.id, adminId).catch((err) =>
+      console.error('Failed to persist notification read:', err)
+    );
 
     if (notif.link) {
       router.push(notif.link as Route);
@@ -185,7 +177,7 @@ export function NotificationDropdown({
         )}
       </button>
 
-      {/* Popover Card */}
+      {/* Popover */}
       {isOpen && (
         <div className="absolute right-0 mt-2.5 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
           {/* Header */}
@@ -209,7 +201,7 @@ export function NotificationDropdown({
             )}
           </div>
 
-          {/* List Content */}
+          {/* List */}
           <div className="max-h-64 overflow-y-auto divide-y divide-gray-100">
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center p-8 text-gray-400">

@@ -1,7 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/auth/get-session';
 import { formatLlcName } from '../admin/formatters';
 import type {
   CustomerDashboardData,
@@ -15,11 +14,8 @@ import type {
 async function fetchDashboardDataQuery(
   supabase: any,
   userId: string,
-  fullName: string,
-  userEmail: string
+  fullName: string
 ): Promise<CustomerDashboardData> {
-
-  // 1. Fetch user profile again to ensure fresh settings
   const { data: profileRow } = await supabase
     .from('profiles')
     .select('*')
@@ -30,7 +26,6 @@ async function fetchDashboardDataQuery(
     throw new Error('Profile not found');
   }
 
-  // 2. Fetch all LLC orders for the customer
   const { data: ordersData, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -53,56 +48,11 @@ async function fetchDashboardDataQuery(
 
   const orders = ordersData || [];
 
-  // 3. For any order without a linked company_id, check if a company exists or create one (auto-link like getOrderInternalData)
   const llcs: CustomerLlcItem[] = [];
-  const autoLinkPromises = orders.map(async (o: any) => {
-    let company = o.companies;
-    let companyId = o.company_id;
+  orders.forEach((o: any) => {
+    const company = o.companies;
+    const companyId = o.company_id;
 
-    if (!companyId) {
-      // Look up company by owner_id or create one
-      const { data: existing } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('owner_id', userId)
-        .maybeSingle();
-
-      if (existing) {
-        company = existing;
-        companyId = existing.id;
-        // link order
-        await supabase
-          .from('orders')
-          .update({ company_id: companyId })
-          .eq('id', o.id);
-      } else {
-        const formSnapshot = o.form_snapshot || {};
-        const businessName =
-          formSnapshot?.step3?.businessName ?? formSnapshot?.businessName ?? `LLC for order ${o.order_number}`;
-
-        const { data: newCompany, error: createError } = await supabase
-          .from('companies')
-          .insert({
-            owner_id: userId,
-            company_name: businessName,
-            business_address: formSnapshot?.step3?.businessAddress || {},
-            mailing_address: formSnapshot?.step3?.mailingAddress || {},
-          })
-          .select('*')
-          .single();
-
-        if (!createError && newCompany) {
-          company = newCompany;
-          companyId = newCompany.id;
-          await supabase
-            .from('orders')
-            .update({ company_id: companyId })
-            .eq('id', o.id);
-        }
-      }
-    }
-
-    // Determine compliance status
     let complianceState: CustomerLlcItem['complianceState'] = 'unknown';
     if (o.status === 'completed' || o.status === 'confirmed') {
       complianceState = 'compliant';
@@ -136,9 +86,6 @@ async function fetchDashboardDataQuery(
     });
   });
 
-  await Promise.all(autoLinkPromises);
-
-  // 4. Fetch pending document resubmission requests for user's orders
   const orderIds = orders.map((o: any) => o.id);
   let pendingResubmissions: any[] = [];
   if (orderIds.length > 0) {
@@ -150,10 +97,8 @@ async function fetchDashboardDataQuery(
     pendingResubmissions = resubmits || [];
   }
 
-  // 5. Build action items
   const actions: CustomerActionRequired[] = [];
 
-  // Add document resubmission actions
   pendingResubmissions.forEach((r) => {
     const linkedOrder = llcs.find((l) => l.id === r.order_id);
     const llcName = linkedOrder?.llcName || 'Your LLC';
@@ -174,7 +119,6 @@ async function fetchDashboardDataQuery(
     });
   });
 
-  // Add payment actions for unpaid/partial orders
   llcs.forEach((llc) => {
     if (llc.paymentStatus !== 'paid') {
       const orderRecord = orders.find((o: any) => o.id === llc.id);
@@ -195,7 +139,6 @@ async function fetchDashboardDataQuery(
     }
   });
 
-  // Add renewal actions if renewal_due
   llcs.forEach((llc) => {
     if (llc.complianceState === 'renewal_due') {
       const companyRecord = orders.find((o: any) => o.id === llc.id)?.companies;
@@ -216,7 +159,6 @@ async function fetchDashboardDataQuery(
     }
   });
 
-  // 6. Fetch user notifications (personal or general customer)
   const { data: notificationsData } = await supabase
     .from('notifications')
     .select('id, title, body, type, link, is_read, created_at, payload')
@@ -249,10 +191,8 @@ async function fetchDashboardDataQuery(
     };
   });
 
-  // 7. Fetch custom billing invoices matching user's full_name
   const invoices: CustomerInvoiceItem[] = [];
 
-  // First, map orders as billing items
   orders.forEach((o: any) => {
     const formSnapshot = o.form_snapshot || {};
     const rawBusinessName = formSnapshot?.step3?.businessName ?? formSnapshot?.businessName ?? '';
@@ -271,7 +211,6 @@ async function fetchDashboardDataQuery(
     });
   });
 
-  // Second, look up from public.invoices table by matching owner's name
   if (fullName) {
     const { data: manualInvoices } = await supabase
       .from('invoices')
@@ -280,21 +219,19 @@ async function fetchDashboardDataQuery(
       .order('date', { ascending: false });
 
     (manualInvoices || []).forEach((row: any) => {
-      // Prevent duplicates if already added
       invoices.push({
         id: row.id,
         invoiceNumber: row.invoice_number,
         date: row.date,
         name: row.name,
-        amount: Number(row.total_amount_pkr) || 0, // PKR or USD? The database column total_amount_pkr stores PKR
-        status: 'paid', // Admin created invoices are usually logged payouts or paid records
+        amount: Number(row.total_amount_pkr) || 0,
+        status: 'paid',
         type: 'manual',
         notes: row.notes,
       });
     });
   }
 
-  // 8. Calculate stats
   const totalLlcs = llcs.length;
   const activeLlcs = llcs.filter((l) => l.status === 'completed' || l.status === 'confirmed').length;
   const pendingActions = actions.filter((a) => a.priority === 'high').length;
@@ -306,7 +243,7 @@ async function fetchDashboardDataQuery(
     const today = new Date();
     const diffTime = renewalDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 && diffDays <= 60; // Next 60 days
+    return diffDays > 0 && diffDays <= 60;
   }).length;
 
   const stats: CustomerDashboardStats = {
@@ -327,24 +264,23 @@ async function fetchDashboardDataQuery(
   };
 }
 
-export async function getDashboardData(userId: string, fullName: string, userEmail: string): Promise<CustomerDashboardData> {
+export async function getDashboardData(userId: string, fullName: string): Promise<CustomerDashboardData> {
   const supabase = await createClient();
   return unstable_cache(
-    async (id: string, name: string, email: string) => {
-      return fetchDashboardDataQuery(supabase, id, name, email);
+    async (id: string, name: string) => {
+      return fetchDashboardDataQuery(supabase, id, name);
     },
     [`customer-dashboard-${userId}`],
     {
-      revalidate: 30, // 30 seconds TTL
+      revalidate: 30,
       tags: [`customer-dashboard-${userId}`, `notif-list-${userId}`, `order-list-${userId}`],
     }
-  )(userId, fullName, userEmail);
+  )(userId, fullName);
 }
 
-// React cache wrapper for render-tree deduplication
-export const getCachedDashboardData = cache(async () => {
-  const session = await getSession();
-  const name = session.profile.full_name || '';
-  const email = session.profile.email || '';
-  return getDashboardData(session.user.id, name, email);
+export const getCachedDashboardData = cache(async (
+  userId: string,
+  fullName: string
+) => {
+  return getDashboardData(userId, fullName);
 });

@@ -10,7 +10,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateTag, revalidatePath } from 'next/cache';
 import { UserRole } from '@/types/admin';
 
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: 'layout' | 'page') => void;
 
 async function verifyAdminRole() {
@@ -86,7 +85,7 @@ export async function createUser(formData: FormData): Promise<{ error?: string }
     }
 
     // 3. Revalidate
-    revalidateTagTyped('user-list');
+    revalidateTag('user-list', 'max');
     revalidatePathTyped('/admin/users', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -158,7 +157,7 @@ export async function updateUser(id: string, formData: FormData): Promise<{ erro
     }
 
     // 3. Revalidate
-    revalidateTagTyped('user-list');
+    revalidateTag('user-list', 'max');
     revalidatePathTyped('/admin/users', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -203,7 +202,7 @@ export async function deactivateUser(id: string, currentIsActive: boolean): Prom
     }
 
     // 3. Revalidate
-    revalidateTagTyped('user-list');
+    revalidateTag('user-list', 'max');
     revalidatePathTyped('/admin/users', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -240,7 +239,7 @@ export async function deleteUser(id: string): Promise<{ error?: string }> {
     }
 
     // 3. Revalidate
-    revalidateTagTyped('user-list');
+    revalidateTag('user-list', 'max');
     revalidatePathTyped('/admin/users', 'page');
     revalidatePathTyped('/admin', 'layout');
 

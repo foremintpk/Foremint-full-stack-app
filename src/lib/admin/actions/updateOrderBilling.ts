@@ -6,6 +6,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateOrder } from './revalidateOrder';
 import type { OrderBilling } from '@/types/admin';
 
@@ -67,8 +68,8 @@ export async function updateOrderBilling(
       }
     }
 
-    // 5. Write audit log
-    const { error: auditError } = await supabase
+    // 5. Write audit log — admin client bypasses RLS on audit_logs
+    const { error: auditError } = await createAdminClient()
       .from('audit_logs')
       .insert({
         actor_id: adminId,
@@ -79,7 +80,7 @@ export async function updateOrderBilling(
           changed_fields: changedFields,
           saved_at: new Date().toISOString(),
         },
-      });
+      } as any);
 
     if (auditError) {
       console.error('[updateOrderBilling Audit Log Error]:', auditError);

@@ -72,19 +72,29 @@ export async function validateCoupon(
 
   const active = coupon.status === 'active'
   if (!active) {
-    return { error: 'This coupon is inactive.' }
+    return {
+      error: coupon.status === 'deleted'
+        ? 'This coupon is no longer available.'
+        : 'This coupon is inactive.',
+    }
   }
 
-  const totalUses = Number(coupon.total_uses || 0)
+  const totalUses = Number(coupon.total_uses ?? -1)
   const usedCount = Number(coupon.used_count || 0)
-  const perUserUses = Number(coupon.per_user_uses || 0)
+  const perUserUses = Number(coupon.per_user_uses ?? -1)
 
-  if (totalUses > 0 && usedCount >= totalUses) {
+  if (totalUses < -1 || perUserUses < -1) {
+    return { error: 'This coupon is misconfigured. Please contact support.' }
+  }
+
+  // -1 means unlimited: skip the cap check entirely
+  if (totalUses !== -1 && totalUses > 0 && usedCount >= totalUses) {
     return { error: 'This coupon has reached its usage limit.' }
   }
 
   const userUsageCount = await fetchCouponUsageCount(supabase, coupon.id, userId)
-  if (perUserUses > 0 && userUsageCount >= perUserUses) {
+  // -1 means unlimited per user: skip the per-user cap check
+  if (perUserUses !== -1 && perUserUses > 0 && userUsageCount >= perUserUses) {
     return { error: 'You have already used this coupon the maximum number of times.' }
   }
 

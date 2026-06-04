@@ -18,7 +18,10 @@ export default async function NotificationsPage() {
     redirect('/login');
   }
 
-  const data = await getCachedDashboardData();
+  const data = await getCachedDashboardData(
+    session.user.id,
+    session.profile.full_name || ''
+  );
 
   return (
     <NotificationsClient

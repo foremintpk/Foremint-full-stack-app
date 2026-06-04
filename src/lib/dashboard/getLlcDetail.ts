@@ -1,6 +1,8 @@
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { hydrateSupabaseDocumentUrls } from '@/lib/storage/document-urls';
 import { getSession } from '@/lib/auth/get-session';
 import { formatLlcName } from '../admin/formatters';
 import type { OrderDetail, OrderDocument, OrderMember, OrderStatusHistory, ResubmissionRequest } from '@/types/admin';
@@ -77,7 +79,13 @@ async function fetchLlcDetailQuery(
   ]);
 
   const clientDocs = (docsRes.data || []) as any[];
-  
+
+  // Replace stored public URLs with fresh signed URLs for private Supabase storage files.
+  // Admin uploads ≤100KB go to the private 'onboarding-documents' bucket using getPublicUrl()
+  // which returns an unusable URL when the bucket is not public. We fix this at read time.
+  const adminSdk = createAdminClient();
+  await hydrateSupabaseDocumentUrls(clientDocs, adminSdk);
+
   // Format documents
   const documents: OrderDocument[] = clientDocs.map((doc) => ({
     id: doc.id,
@@ -225,3 +233,5 @@ export const getCachedLlcDetail = cache(async (orderId: string) => {
   const session = await getSession();
   return getLlcDetail(orderId, session.user.id);
 });
+
+

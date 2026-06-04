@@ -52,11 +52,8 @@ export async function GET(req: NextRequest) {
       items,
     });
 
-    // Apply strict private caching headers
-    response.headers.set(
-      'Cache-Control',
-      'private, max-age=30, stale-while-revalidate=60'
-    );
+    // Never let the browser cache notification responses — always fetch fresh from server
+    response.headers.set('Cache-Control', 'no-store');
 
     return response;
   } catch (err: any) {

@@ -10,7 +10,6 @@ import { revalidateTag, revalidatePath } from 'next/cache';
 import { PackageStatus } from '@/types/admin';
 
 // Typecast cache revalidation methods for Next.js 16 compiler compatibility
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: 'layout' | 'page') => void;
 
 function parseFeatures(raw: string): string[] {
@@ -78,7 +77,7 @@ export async function createPackage(
     }
 
     // Revalidate
-    revalidateTagTyped('packages');
+    revalidateTag('packages', 'max');
     revalidatePathTyped('/admin/packages', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -131,7 +130,7 @@ export async function updatePackage(
     }
 
     // Revalidate
-    revalidateTagTyped('packages');
+    revalidateTag('packages', 'max');
     revalidatePathTyped('/admin/packages', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -158,7 +157,7 @@ export async function deletePackage(
     }
 
     // Revalidate
-    revalidateTagTyped('packages');
+    revalidateTag('packages', 'max');
     revalidatePathTyped('/admin/packages', 'page');
     revalidatePathTyped('/admin', 'layout');
 
@@ -190,7 +189,7 @@ export async function togglePackageStatus(
     }
 
     // Revalidate
-    revalidateTagTyped('packages');
+    revalidateTag('packages', 'max');
     revalidatePathTyped('/admin/packages', 'page');
     revalidatePathTyped('/admin', 'layout');
 

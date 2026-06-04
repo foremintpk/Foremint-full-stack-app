@@ -80,8 +80,8 @@ export async function updateGeneralInfo(
     }
 
     // 3. Invalidate caches
-    (revalidateTag as any)(`order-${orderId}`);
-    (revalidateTag as any)('order-list-llc');
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag('order-list-llc', 'max');
 
     return { success: true };
   } catch (err: any) {

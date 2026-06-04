@@ -5,9 +5,10 @@
 
 'use client';
 
-import React, { useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useLlcNavigation } from '@/context/llc-navigation-context';
 
 interface LlcPaginationProps {
   totalCount: number;
@@ -22,9 +23,8 @@ export default function LlcPagination({
   currentPage,
   pageSize,
 }: LlcPaginationProps): React.JSX.Element | null {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const { isPending, navigate } = useLlcNavigation();
 
   if (totalPages <= 1) return null;
 
@@ -41,9 +41,7 @@ export default function LlcPagination({
 
   const handlePageClick = (pageNumber: number): void => {
     if (pageNumber < 1 || pageNumber > totalPages || pageNumber === currentPage || isPending) return;
-    startTransition(() => {
-      router.push(updatePageParam(pageNumber) as any);
-    });
+    navigate(updatePageParam(pageNumber));
   };
 
   // Generate visible page numbers (max 5 around current page)

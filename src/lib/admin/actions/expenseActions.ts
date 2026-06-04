@@ -3,7 +3,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidateTag, revalidatePath } from 'next/cache';
 
-const revalidateTagTyped = revalidateTag as unknown as (tag: string) => void;
 
 // EXPENSE ACTIONS
 
@@ -55,7 +54,7 @@ export async function createExpense(formData: FormData): Promise<{ error?: strin
       return { error: insertError.message || 'Failed to create expense' };
     }
 
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-list', 'max');
     revalidatePath('/admin/expenses', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -114,7 +113,7 @@ export async function updateExpense(id: string, formData: FormData): Promise<{ e
       return { error: updateError.message || 'Failed to update expense' };
     }
 
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-list', 'max');
     revalidatePath('/admin/expenses', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -153,7 +152,7 @@ export async function deleteExpense(id: string): Promise<{ error?: string }> {
       return { error: error.message || 'Failed to delete expense' };
     }
 
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-list', 'max');
     revalidatePath('/admin/expenses', 'page');
     revalidatePath('/admin', 'layout');
 
@@ -204,8 +203,8 @@ export async function createExpenseCategory(formData: FormData): Promise<{ error
       return { error: error.message || 'Failed to create category' };
     }
 
-    revalidateTagTyped('expense-categories');
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-categories', 'max');
+    revalidateTag('expense-list', 'max');
 
     return {};
   } catch (err: any) {
@@ -253,8 +252,8 @@ export async function updateExpenseCategory(id: string, formData: FormData): Pro
       return { error: error.message || 'Failed to update category' };
     }
 
-    revalidateTagTyped('expense-categories');
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-categories', 'max');
+    revalidateTag('expense-list', 'max');
 
     return {};
   } catch (err: any) {
@@ -293,8 +292,8 @@ export async function deleteExpenseCategory(id: string): Promise<{ error?: strin
       return { error: error.message || 'Failed to delete category' };
     }
 
-    revalidateTagTyped('expense-categories');
-    revalidateTagTyped('expense-list');
+    revalidateTag('expense-categories', 'max');
+    revalidateTag('expense-list', 'max');
 
     return {};
   } catch (err: any) {

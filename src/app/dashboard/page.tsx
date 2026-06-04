@@ -60,7 +60,10 @@ export default async function DashboardOverviewPage() {
     redirect('/login');
   }
 
-  const data = await getCachedDashboardData();
+  const data = await getCachedDashboardData(
+    session.user.id,
+    session.profile.full_name || ''
+  );
   const { stats, llcs, actions } = data;
   const firstName = session.profile.full_name?.split(' ')[0] || 'there';
 

@@ -19,8 +19,7 @@ export default async function CustomerDashboardLayout({
 
   // Retrieve initial dashboard states for badges & notifications (hits Layer 1 cache)
   const name = session.profile.full_name || '';
-  const email = session.profile.email || '';
-  const data = await getDashboardData(session.user.id, name, email);
+  const data = await getDashboardData(session.user.id, name);
 
   const notificationsCount = data.notifications.filter(n => !n.isRead).length;
   const actionsCount = data.actions.length;

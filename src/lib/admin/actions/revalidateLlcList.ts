@@ -8,6 +8,6 @@
 import { revalidateTag } from 'next/cache';
 
 export async function revalidateLlcList(): Promise<void> {
-  (revalidateTag as any)('order-list-llc');
-  (revalidateTag as any)('order-list-llc-stats');
+  revalidateTag('order-list-llc', 'max');
+  revalidateTag('order-list-llc-stats', 'max');
 }

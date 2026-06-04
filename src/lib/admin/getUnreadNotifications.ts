@@ -7,7 +7,7 @@
  *    - React cache() for request deduplication in a single render tree.
  *    - unstable_cache() with 30 seconds TTL and targeted invalidation tags.
  * 3. RBAC: Constrained to notifications targeting the active admin ID or role.
- * 4. Revalidation / Cache Busting: revalidateTag(`notif-list-${adminId}`) or revalidateTag(`notif-count-${adminId}`).
+ * 4. Revalidation / Cache Busting: revalidateTag(`notif-list-${adminId}`, 'max') or revalidateTag(`notif-count-${adminId}`, 'max').
  *
  * FIX (Next.js 15+): cookies() must NOT be called inside unstable_cache().
  * createClient() is now called OUTSIDE the cache boundary and the client
@@ -54,7 +54,6 @@ export async function getCachedUnreadNotifications(
   adminId: string,
   adminRole: AdminRole
 ): Promise<SafeAdminNotification[]> {
-  // createClient() (which calls cookies()) lives OUTSIDE unstable_cache — required by Next.js 15+
   const supabase = await createClient();
 
   return unstable_cache(
@@ -74,5 +73,4 @@ export async function getCachedUnreadNotifications(
   )(adminId, adminRole);
 }
 
-// Wrap in React cache() so multiple Server Component calls in a single render tree hit the DB exactly once.
 export const getUnreadNotifications = cache(getCachedUnreadNotifications);

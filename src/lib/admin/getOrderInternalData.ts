@@ -5,7 +5,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { hydrateSupabaseDocumentUrls } from '@/lib/storage/document-urls';
 import type {
   FormationDetails,
   OrderDocument,
@@ -27,9 +28,9 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
   }
 
   const supabase = await createClient();
+  const adminSdk = createAdminClient();
 
   const runQuery = async (): Promise<OrderInternalData | null> => {
-    // 1. Fetch order details to get user_id, company_id, package_price, etc.
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*')
@@ -42,51 +43,8 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
     }
 
     const o = order as any;
-    let companyId = o.company_id;
+    const companyId = o.company_id;
 
-    // 2. If no company linked, check if a company exists for this owner, or create a new one
-    if (!companyId) {
-      const { data: existingCompany } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', o.user_id)
-        .maybeSingle();
-
-      if (existingCompany) {
-        companyId = existingCompany.id;
-        // Link order to company
-        await supabase
-          .from('orders')
-          .update({ company_id: companyId })
-          .eq('id', orderId);
-      } else {
-        // Create new company
-        const formSnapshot = (o.form_snapshot as Record<string, any>) || {};
-        const businessName =
-          formSnapshot?.step3?.businessName ?? formSnapshot?.businessName ?? `LLC for order ${o.order_number}`;
-
-        const { data: newCompany, error: createError } = await supabase
-          .from('companies')
-          .insert({
-            owner_id: o.user_id,
-            company_name: businessName,
-            business_address: formSnapshot?.step3?.businessAddress || {},
-            mailing_address: formSnapshot?.step3?.mailingAddress || {},
-          })
-          .select('id')
-          .single();
-
-        if (!createError && newCompany) {
-          companyId = newCompany.id;
-          await supabase
-            .from('orders')
-            .update({ company_id: companyId })
-            .eq('id', orderId);
-        }
-      }
-    }
-
-    // 3. Fetch company formation details
     let formationDetails: FormationDetails = {
       einNumber: null,
       filingId: null,
@@ -119,14 +77,16 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
       }
     }
 
-    // 4. Fetch internal documents (including slots & superseded versions)
     const { data: docs } = await (supabase as any)
       .from('documents')
       .select('*')
       .eq('order_id', orderId)
       .order('uploaded_at', { ascending: false });
 
-    const documents: OrderDocument[] = (docs || []).map((doc: any) => ({
+    const clientDocs = (docs || []) as any[];
+    await hydrateSupabaseDocumentUrls(clientDocs, adminSdk);
+
+    const documents: OrderDocument[] = clientDocs.map((doc: any) => ({
       id: doc.id,
       documentType: doc.document_type || 'Internal Doc',
       fileName: doc.file_name,
@@ -142,7 +102,6 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
       isActive: !doc.superseded_at,
     }));
 
-    // 5. Fetch internal addons
     const { data: internalAddonsRes } = await (supabase as any)
       .from('order_internal_addons')
       .select('*')
@@ -216,14 +175,9 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
     };
   };
 
-  return unstable_cache(
-    async (): Promise<OrderInternalData | null> => {
-      return runQuery();
-    },
-    [`order-internal-${orderId}`],
-    {
-      revalidate: 60,
-      tags: [`order-${orderId}`, 'order-list-llc'],
-    }
-  )();
+  return runQuery();
 }
+
+
+
+

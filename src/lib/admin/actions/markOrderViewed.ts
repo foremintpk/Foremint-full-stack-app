@@ -66,10 +66,10 @@ export async function markOrderViewed(
     }
 
     // 3. Clear badges and list page NEW tag
-    (revalidateTag as any)(`unread-orders-${adminId}`);
-    (revalidateTag as any)('order-list-llc');
-    (revalidateTag as any)(`nav-badges-${adminId}`);
-    (revalidateTag as any)(`order-${orderId}`);
+    revalidateTag(`unread-orders-${adminId}`, 'max');
+    revalidateTag('order-list-llc', 'max');
+    revalidateTag(`nav-badges-${adminId}`, 'max');
+    revalidateTag(`order-${orderId}`, 'max');
   } catch (err) {
     console.error('[markOrderViewed Exception]:', err);
   }

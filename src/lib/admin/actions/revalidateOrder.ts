@@ -9,8 +9,8 @@ import { revalidateTag, revalidatePath } from 'next/cache';
 
 export async function revalidateOrder(orderId: string): Promise<void> {
   if (!orderId) return;
-  (revalidateTag as any)(`order-${orderId}`);
-  (revalidateTag as any)(`order-internal-${orderId}`);
-  (revalidateTag as any)('order-list-llc');
+  revalidateTag(`order-${orderId}`, 'max');
+  revalidateTag(`order-internal-${orderId}`, 'max');
+  revalidateTag('order-list-llc', 'max');
   (revalidatePath as any)(`/admin/llc-registrations/${orderId}`, 'layout');
 }

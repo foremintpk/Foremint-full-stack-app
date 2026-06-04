@@ -25,26 +25,34 @@ async function fetchOverviewStats(
   start: string,
   end: string
 ): Promise<OverviewStats> {
-  // Fire parallel queries using Promise.all to dramatically cut network overhead
   const [llcRes, paypalRes, revenueRes] = await Promise.all([
-    supabase
+    (async () => {
+      const result = await supabase
       .from('orders')
       .select('status')
       .eq('order_type', 'llc')
       .gte('created_at', start)
-      .lte('created_at', end),
-    supabase
+      .lte('created_at', end);
+      return result;
+    })(),
+    (async () => {
+      const result = await supabase
       .from('orders')
       .select('status')
       .eq('order_type', 'paypal')
       .gte('created_at', start)
-      .lte('created_at', end),
-    supabase
+      .lte('created_at', end);
+      return result;
+    })(),
+    (async () => {
+      const result = await supabase
       .from('orders')
       .select('order_type, grand_total')
       .eq('payment_status', 'paid')
       .gte('created_at', start)
-      .lte('created_at', end),
+      .lte('created_at', end);
+      return result;
+    })(),
   ]);
 
   if (llcRes.error) console.error('Error fetching LLC stats:', llcRes.error);
@@ -150,7 +158,6 @@ export async function getCachedOverviewStats(
   startDateStr: string,
   endDateStr: string
 ): Promise<OverviewStats> {
-  // createClient() (which calls cookies()) lives OUTSIDE unstable_cache — required by Next.js 15+
   const supabase = await createClient();
 
   return unstable_cache(

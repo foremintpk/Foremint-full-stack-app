@@ -173,41 +173,11 @@ export function AddonsSection({ order, allAddons }: AddonsSectionProps): React.J
                     </label>
                   );
                 })}
-                {/* Keep legacy registry items if not present in DB */}
-                {Object.values(ADDON_REGISTRY).map((addon) => {
-                  if (allAddons.some((a) => a.id === addon.id)) return null;
-                  const isChecked = selectedIds.includes(addon.id);
-                  return (
-                    <label
-                      key={addon.id}
-                      className={`flex items-start gap-3 border p-4 rounded-[0.125rem] cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-[#34088f] bg-[#34088f]/5'
-                          : 'border-[#ebebeb] hover:border-gray-300 bg-white'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => handleCheckboxChange(addon.id, e.target.checked)}
-                        className="mt-1 h-4 w-4 accent-[#34088f] cursor-pointer"
-                      />
-                      <div className="space-y-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-900 leading-tight">
-                            {addon.title}
-                          </span>
-                          <span className="text-xs font-bold text-[#34088f]">
-                            ${addon.price} {addon.billingLabel}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-gray-500 font-medium leading-relaxed truncate">
-                          {addon.description[0]}
-                        </p>
-                      </div>
-                    </label>
-                  );
-                })}
+                {allAddons.length === 0 && (
+                  <p className="col-span-2 text-xs text-gray-400 font-inter py-2">
+                    No published add-ons available. Add add-ons in the Add-ons Management section.
+                  </p>
+                )}
               </div>
 
               {/* Unsaved changes banner list */}

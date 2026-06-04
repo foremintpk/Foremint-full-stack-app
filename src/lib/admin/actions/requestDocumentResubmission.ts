@@ -89,8 +89,8 @@ export async function requestDocumentResubmission(
     }
 
     // 3. Clear relevant cache tags
-    (revalidateTag as any)(`order-${orderId}`);
-    (revalidateTag as any)(`order-resubmit-${orderId}`);
+    revalidateTag(`order-${orderId}`, 'max');
+    revalidateTag(`order-resubmit-${orderId}`, 'max');
 
     return { success: true };
   } catch (err: any) {

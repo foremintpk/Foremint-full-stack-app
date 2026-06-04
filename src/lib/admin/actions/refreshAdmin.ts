@@ -16,14 +16,14 @@ export async function refreshAdminData(adminId: string): Promise<void> {
   if (!adminId) return;
 
   // Invalidate cached resources by tag
-  (revalidateTag as any)(`notif-count-${adminId}`);
-  (revalidateTag as any)(`notif-list-${adminId}`);
-  (revalidateTag as any)(`unread-orders-${adminId}`);
-  (revalidateTag as any)(`nav-badges-${adminId}`);
-  (revalidateTag as any)('overview-stats');
-  (revalidateTag as any)('overview-earnings');
-  (revalidateTag as any)('order-list-llc');
-  (revalidateTag as any)('order-list-llc-stats');
+  revalidateTag(`notif-count-${adminId}`, 'max');
+  revalidateTag(`notif-list-${adminId}`, 'max');
+  revalidateTag(`unread-orders-${adminId}`, 'max');
+  revalidateTag(`nav-badges-${adminId}`, 'max');
+  revalidateTag('overview-stats', 'max');
+  revalidateTag('overview-earnings', 'max');
+  revalidateTag('order-list-llc', 'max');
+  revalidateTag('order-list-llc-stats', 'max');
 
   // Invalidate Next.js layouts & pages under the /admin router segment
   revalidatePath('/admin', 'layout');

@@ -15,6 +15,7 @@ import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin'
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { LlcNameProvider } from '@/context/llc-name-context';
+import { AdminBadgeContext } from '@/context/admin-badge-context';
 
 interface AdminShellProps {
   adminProfile: AdminProfile;
@@ -36,17 +37,20 @@ export function AdminShell({
 
   const handleNotificationBadgeChange = useCallback((unreadNotifCount: number) => {
     setLiveBadges((prev) => {
-      if (prev.notifications === unreadNotifCount) {
-        return prev;
-      }
-      return {
-        ...prev,
-        notifications: unreadNotifCount,
-      };
+      if (prev.notifications === unreadNotifCount) return prev;
+      return { ...prev, notifications: unreadNotifCount };
     });
   }, []);
 
+  const decrementLlcOrderBadge = useCallback(() => {
+    setLiveBadges((prev) => ({
+      ...prev,
+      llcRegistrations: Math.max(0, prev.llcRegistrations - 1),
+    }));
+  }, []);
+
   return (
+    <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>
     <LlcNameProvider initialNames={initialLlcNames}>
       <div className="flex h-screen w-screen overflow-hidden bg-gray-50 font-inter">
         {/* Sidebar navigation controls */}
@@ -72,5 +76,6 @@ export function AdminShell({
         </div>
       </div>
     </LlcNameProvider>
+    </AdminBadgeContext.Provider>
   );
 }

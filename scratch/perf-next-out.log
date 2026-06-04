@@ -1,0 +1,10 @@
+
+> foremint@0.1.0 dev
+> next dev -p 3101
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3101
+- Network:       http://192.168.100.5:3101
+- Environments: .env.local
+✓ Ready in 559ms
+[?25h

@@ -5,10 +5,11 @@
 
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { LlcListFilters } from '@/types/admin';
 import { DATE_RANGES } from '@/lib/admin/dateRanges';
+import { useLlcNavigation } from '@/context/llc-navigation-context';
 
 interface LlcListControlsProps {
   filters: LlcListFilters;
@@ -17,12 +18,11 @@ interface LlcListControlsProps {
 export default function LlcListControls({
   filters,
 }: LlcListControlsProps): React.JSX.Element {
-  const router = useRouter();
   const searchParams = useSearchParams();
+  const { isPending, navigate } = useLlcNavigation();
 
   const [searchTerm, setSearchTerm] = useState(filters.q);
   const [isDebouncing, setIsDebouncing] = useState(false);
-  const [isPending, startTransition] = useTransition();
 
   // Sync state if q filter in URL updates externally
   useEffect(() => {
@@ -44,17 +44,15 @@ export default function LlcListControls({
       } else {
         params.delete('q');
       }
-      params.set('page', '1'); // reset page on search update
-      startTransition(() => {
-        router.push(`/admin/llc-registrations?${params.toString()}`);
-        setIsDebouncing(false);
-      });
+      params.set('page', '1');
+      navigate(`/admin/llc-registrations?${params.toString()}`);
+      setIsDebouncing(false);
     }, 350);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, filters.q, router]);
+  }, [searchTerm, filters.q, navigate]);
 
   // Load pagesize preference from sessionStorage on client mount
   useEffect(() => {
@@ -63,11 +61,9 @@ export default function LlcListControls({
       const params = new URLSearchParams(window.location.search);
       params.set('pageSize', savedSize);
       params.set('page', '1');
-      startTransition(() => {
-        router.push(`/admin/llc-registrations?${params.toString()}`);
-      });
+      navigate(`/admin/llc-registrations?${params.toString()}`);
     }
-  }, [filters.pageSize, filters.q, router]);
+  }, [filters.pageSize, filters.q, navigate]);
 
   const handleDateChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
     const value = e.target.value;
@@ -77,10 +73,8 @@ export default function LlcListControls({
     } else {
       params.delete('filter');
     }
-    params.set('page', '1'); // reset to page 1
-    startTransition(() => {
-      router.push(`/admin/llc-registrations?${params.toString()}`);
-    });
+    params.set('page', '1');
+    navigate(`/admin/llc-registrations?${params.toString()}`);
   };
 
   const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
@@ -101,10 +95,7 @@ export default function LlcListControls({
       params.set('dir', 'asc');
     }
 
-    // Preserve the current page
-    startTransition(() => {
-      router.push(`/admin/llc-registrations?${params.toString()}`);
-    });
+    navigate(`/admin/llc-registrations?${params.toString()}`);
   };
 
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
@@ -113,10 +104,8 @@ export default function LlcListControls({
 
     const params = new URLSearchParams(window.location.search);
     params.set('pageSize', value);
-    params.set('page', '1'); // reset to page 1
-    startTransition(() => {
-      router.push(`/admin/llc-registrations?${params.toString()}`);
-    });
+    params.set('page', '1');
+    navigate(`/admin/llc-registrations?${params.toString()}`);
   };
 
   // Determine active sort dropdown key

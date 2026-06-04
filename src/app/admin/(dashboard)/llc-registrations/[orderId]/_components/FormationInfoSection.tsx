@@ -96,9 +96,7 @@ export function FormationInfoSection({ order, allPackages }: FormationInfoSectio
  const getPackageLabel = (p: string) => {
  const pkg = allPackages.find(x => x.id === p);
  if (pkg) return `${pkg.name} ($${pkg.price})`;
- if (p === 'standard') return 'Standard Package ($120)';
- if (p === 'advanced') return 'Advanced Package ($170)';
- return p;
+ return p || '—';
  };
 
  const readSnapshot = (order.formSnapshot as any) || {};
@@ -257,12 +255,6 @@ export function FormationInfoSection({ order, allPackages }: FormationInfoSectio
      {pkg.name} (${pkg.price})
    </option>
  ))}
- {!allPackages.some(pkg => pkg.id === 'standard') && (
-   <option value="standard">Standard Package ($120)</option>
- )}
- {!allPackages.some(pkg => pkg.id === 'advanced') && (
-   <option value="advanced">Advanced Package ($170)</option>
- )}
  </select>
  </div>
  <div className="flex flex-col gap-1 md:col-span-2 lg:col-span-3">

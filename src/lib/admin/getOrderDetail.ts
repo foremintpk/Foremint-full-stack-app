@@ -7,7 +7,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import { unstable_cache } from 'next/cache';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { hydrateSupabaseDocumentUrls } from '@/lib/storage/document-urls';
 import { formatLlcName } from './formatters';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
@@ -29,9 +30,9 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
   }
 
   const supabase = await createClient();
+  const adminSdk = createAdminClient();
 
   const runQuery = async (client: SupabaseClient<Database>): Promise<OrderDetail | null> => {
-    // Parallel queries to fetch core order data, documents, status history, and resubmission requests
     const [orderRes, docsRes, historyRes, resubmitRes] = await Promise.all([
       (client as any)
         .from('orders')
@@ -48,7 +49,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         .single(),
       (client as any)
         .from('documents')
-        .select('*'), // Filtered post-query based on order's user_id to ensure RLS compliance
+        .select('*'),
       (client as any)
         .from('order_status_history')
         .select(`
@@ -69,7 +70,6 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         .eq('order_id', orderId)
         .eq('status', 'pending'),
     ]);
-
     if (orderRes.error || !orderRes.data) {
       console.error('[getOrderDetail Error fetching order]:', orderRes.error);
       return null;
@@ -85,6 +85,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       if (!d.order_id && !d.superseded_at) return true;
       return false;
     });
+
+    await hydrateSupabaseDocumentUrls(clientDocs as any[], adminSdk);
 
     const documents: OrderDocument[] = clientDocs.map((doc) => ({
       id: doc.id as string,
@@ -193,7 +195,13 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     return {
       id: order.id,
       orderNumber: order.order_number || '',
-      status: order.status as OrderStatus,
+      // Map raw DB enum values to the UI status aliases used by StatusDropdown
+      status: (() => {
+        const s = order.status as string;
+        if (s === 'in_progress') return 'processing' as OrderStatus;
+        if (s === 'completed' || s === 'confirmed') return 'formed' as OrderStatus;
+        return s as OrderStatus;
+      })(),
       paymentStatus: order.payment_status as any,
       llcName: formatLlcName(rawBusinessName),
       formationState: order.formation_state || formSnapshot?.step2?.state || null,
@@ -223,15 +231,9 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     };
   };
 
-  // Cached fetching using unstable_cache wrapping our runQuery
-  return unstable_cache(
-    async (oid: string): Promise<OrderDetail | null> => {
-      return runQuery(supabase);
-    },
-    [`order-${orderId}`],
-    {
-      revalidate: 60,
-      tags: [`order-${orderId}`, 'order-list-llc'],
-    }
-  )(orderId);
+  return runQuery(supabase);
 }
+
+
+
+

@@ -14,6 +14,6 @@ import { revalidateTag } from 'next/cache';
 
 export async function revalidateOverviewStats(): Promise<void> {
   // Casting to satisfy Next.js 16 signature differences
-  (revalidateTag as any)('overview-stats');
-  (revalidateTag as any)('overview-earnings');
+  revalidateTag('overview-stats', 'max');
+  revalidateTag('overview-earnings', 'max');
 }

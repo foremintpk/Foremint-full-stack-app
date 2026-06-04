@@ -269,6 +269,8 @@ alter table public.orders enable row level security;
 alter table public.queries enable row level security;
 alter table public.query_messages enable row level security;
 alter table public.audit_logs enable row level security;
+alter table public.coupons enable row level security;
+alter table public.coupon_usages enable row level security;
 
 -- Helper function to get current user's role
 create or replace function public.get_my_role()
@@ -404,6 +406,20 @@ create policy "Admins can insert any message"
 create policy "Admins can view audit logs"
   on public.audit_logs for select
   using (public.get_my_role() = 'administrator');
+
+-- ── COUPONS ──
+create policy "Admins and managers can manage coupons"
+  on public.coupons for all
+  using (public.get_my_role() in ('administrator', 'manager'))
+  with check (public.get_my_role() in ('administrator', 'manager'));
+
+create policy "Admins and managers can delete coupons"
+  on public.coupons for delete
+  using (public.get_my_role() in ('administrator', 'manager'));
+
+create policy "Admins and managers can view coupon usages"
+  on public.coupon_usages for select
+  using (public.get_my_role() in ('administrator', 'manager'));
 
 -- ============================================================
 -- STORAGE SETUP
