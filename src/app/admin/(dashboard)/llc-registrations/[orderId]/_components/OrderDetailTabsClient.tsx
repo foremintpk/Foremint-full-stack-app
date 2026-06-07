@@ -13,26 +13,26 @@ import type { ClientNotification } from '@/lib/admin/actions/manageClientNotific
 import type { OrderTicket } from '@/lib/admin/actions/manageTickets';
 import { StatusDropdown } from './StatusDropdown';
 
-import { OverviewTab }          from './tabs/OverviewTab';
-import { FormationDetailsTab }  from './tabs/FormationDetailsTab';
-import { DocumentsTab }         from './tabs/DocumentsTab';
-import { AddonsTab }            from './tabs/AddonsTab';
-import { MembersTab }           from './tabs/MembersTab';
-import { BillingTab }           from './tabs/BillingTab';
-import { NotificationsTab }     from './tabs/NotificationsTab';
+import { OverviewTab } from './tabs/OverviewTab';
+import { FormationDetailsTab } from './tabs/FormationDetailsTab';
+import { DocumentsTab } from './tabs/DocumentsTab';
+import { AddonsTab } from './tabs/AddonsTab';
+import { MembersTab } from './tabs/MembersTab';
+import { BillingTab } from './tabs/BillingTab';
+import { NotificationsTab } from './tabs/NotificationsTab';
 
 // ─── Tab config ──────────────────────────────────────────────────────────────
 
 type TabKey = 'overview' | 'formation' | 'documents' | 'addons' | 'members' | 'billing' | 'notifications';
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: 'overview',       label: 'Overview',       icon: LayoutDashboard },
-  { key: 'formation',      label: 'Formation',      icon: Building2 },
-  { key: 'documents',      label: 'Documents',      icon: FileText },
-  { key: 'addons',         label: 'Add-ons',        icon: Package },
-  { key: 'members',        label: 'Members',        icon: Users },
-  { key: 'billing',        label: 'Billing',        icon: CreditCard },
-  { key: 'notifications',  label: 'Notifications',  icon: Bell },
+  { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { key: 'formation', label: 'Formation', icon: Building2 },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'addons', label: 'Add-ons', icon: Package },
+  { key: 'members', label: 'Members', icon: Users },
+  { key: 'billing', label: 'Billing', icon: CreditCard },
+  { key: 'notifications', label: 'Notifications', icon: Bell },
 ];
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ export function OrderDetailTabsClient({
   const [tickets, setTickets] = useState(initialTickets);
 
   // Sync from server when props update (after router.refresh())
-  useEffect(() => setOrder(initialOrder),              [initialOrder]);
+  useEffect(() => setOrder(initialOrder), [initialOrder]);
   useEffect(() => setInternalData(initialInternalData), [initialInternalData]);
   useEffect(() => setBillingEntries(initialBillingEntries), [initialBillingEntries]);
   useEffect(() => setNotifications(initialNotifications), [initialNotifications]);
@@ -88,6 +88,10 @@ export function OrderDetailTabsClient({
     setBillingEntries(prev => prev.filter(e => e.id !== id));
   }, []);
 
+  const updateBillingEntryLocal = useCallback((entry: BillingEntry) => {
+    setBillingEntries(prev => prev.map(e => e.id === entry.id ? entry : e));
+  }, []);
+
   const addNotificationLocal = useCallback((notif: ClientNotification) => {
     setNotifications(prev => [notif, ...prev]);
   }, []);
@@ -98,19 +102,19 @@ export function OrderDetailTabsClient({
 
   // Status badge color
   const statusColors: Record<string, string> = {
-    pending:    'bg-amber-100 text-amber-800',
+    pending: 'bg-amber-100 text-amber-800',
     processing: 'bg-blue-100 text-blue-800',
-    formed:     'bg-emerald-100 text-emerald-800',
-    cancelled:  'bg-red-100 text-red-700',
+    formed: 'bg-emerald-100 text-emerald-800',
+    cancelled: 'bg-red-100 text-red-700',
   };
   const statusColor = statusColors[order.status] ?? 'bg-gray-100 text-gray-600';
 
   return (
     <div className="space-y-0 font-inter">
       {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-0 pb-0">
+      <div className="bg-white border-b border-gray-200 px-0 pb-0 shadow-sm">
         {/* Back + order meta */}
-        <div className="flex flex-col gap-4 px-1 pt-1 pb-4">
+        <div className="flex flex-col gap-4 px-4 pt-4 pb-4">
           <Link
             href="/admin/llc-registrations"
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-[#34088f] transition-colors w-fit"
@@ -161,11 +165,10 @@ export function OrderDetailTabsClient({
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-colors font-manrope flex-shrink-0 ${
-                activeTab === key
-                  ? 'border-[#34088f] text-[#34088f] bg-[#34088f]/3'
-                  : 'border-transparent text-gray-400 hover:text-gray-700 hover:border-gray-200'
-              }`}
+              className={`flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 whitespace-nowrap transition-colors font-manrope flex-shrink-0 ${activeTab === key
+                ? 'border-[#34088f] text-[#34088f] bg-[#34088f]/3'
+                : 'border-transparent text-gray-400 hover:text-gray-700 hover:border-gray-200'
+                }`}
             >
               <Icon className="w-3.5 h-3.5" />
               {label}
@@ -177,7 +180,7 @@ export function OrderDetailTabsClient({
       {/* ── Tab Content ─────────────────────────────────────────── */}
       <div className="pt-6">
         {activeTab === 'overview' && (
-          <OverviewTab order={order} internalData={internalData} />
+          <OverviewTab order={order} internalData={internalData} billingEntries={billingEntries} />
         )}
         {activeTab === 'formation' && (
           <FormationDetailsTab
@@ -193,6 +196,7 @@ export function OrderDetailTabsClient({
             orderId={order.id}
             adminId={adminId}
             documents={internalData?.documents ?? []}
+            members={order.members ?? []}
             onChanged={refresh}
           />
         )}
@@ -219,6 +223,7 @@ export function OrderDetailTabsClient({
             billingEntries={billingEntries}
             adminId={adminId}
             onEntryAdded={addBillingEntryLocal}
+            onEntryUpdated={updateBillingEntryLocal}
             onEntryRemoved={removeBillingEntryLocal}
             onBillingSaved={refresh}
           />

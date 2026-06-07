@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
 
     // Verify authenticated user
     const supabaseServer = await createServerClient();
-    const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
+    const { data: claimsData, error: authError } = await supabaseServer.auth.getClaims();
+    const user = claimsData?.claims;
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
       .from('onboarding_drafts')
       .select('*')
       .eq('temp_session_key', tempSessionKey)
-      .eq('user_id', user.id)
+      .eq('user_id', user.sub)
       .single();
 
     if (draftError || !draft) {
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
-        user_id: user.id,
+        user_id: user.sub,
         draft_id: draft.id,
         order_type: 'LLC Formation',
         status: 'pending', // or 'awaiting_payment'
@@ -215,13 +216,13 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin
       .from('profiles')
       .update({ onboarding_completed: true })
-      .eq('id', user.id);
+      .eq('id', user.sub);
 
     // ── Fetch profile for customer name ──────────────────────────────────
     const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('full_name')
-      .eq('id', user.id)
+      .eq('id', user.sub)
       .single();
 
     const customerName = profile?.full_name ?? user.email ?? 'Valued Customer';

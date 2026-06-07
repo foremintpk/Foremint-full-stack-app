@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
         destination = next;
       }
 
-      if (next === "/onboarding") {
+      if (next === "/onboarding" || next === "/reset-password") {
         destination = next;
       }
 

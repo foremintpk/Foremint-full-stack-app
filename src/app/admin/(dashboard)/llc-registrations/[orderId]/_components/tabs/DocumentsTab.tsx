@@ -3,13 +3,13 @@
 import { useState, useRef } from 'react';
 import { Upload, Download, Eye, Trash2, FileText, Loader2, Plus, Edit2, Check, X } from 'lucide-react';
 import { deleteDocument } from '@/lib/admin/actions/deleteDocument';
-import { triggerDocumentDownload } from '@/lib/download-file';
-import type { OrderDocument } from '@/types/admin';
+import type { OrderDocument, OrderMember } from '@/types/admin';
 
 interface DocumentsTabProps {
   orderId: string;
   adminId: string;
   documents: OrderDocument[];
+  members: OrderMember[];
   onChanged: () => void;
 }
 
@@ -19,6 +19,8 @@ const PRIMARY_SLOTS = [
   { key: 'ein_letter',               label: 'EIN Confirmation Letter' },
 ] as const;
 
+const PRIMARY_SLOT_KEYS = new Set(PRIMARY_SLOTS.map(s => s.key));
+
 function formatBytes(n: number | null) {
   if (!n) return '';
   if (n < 1024) return `${n} B`;
@@ -26,10 +28,24 @@ function formatBytes(n: number | null) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-// Route all document viewing through an authenticated proxy so the browser always
-// receives the correct Content-Type header regardless of how Cloudinary stores the file.
-function getViewUrl(doc: OrderDocument): string {
-  return `/api/admin/documents/${doc.id}/view`;
+function getOnboardingLabel(doc: OrderDocument, members: OrderMember[]): string {
+  const key = doc.slotKey ?? '';
+  if (key === 'payment_receipt') return 'Payment Receipt';
+  const memberMatch = key.match(/^member_(\d+)_passport$/);
+  if (memberMatch) {
+    const idx = parseInt(memberMatch[1], 10);
+    const member = members.find(m => m.index === idx);
+    const name = member?.name || `Member ${idx + 1}`;
+    return `${name} - ID`;
+  }
+  return doc.documentType || key;
+}
+
+function isOnboardingDoc(doc: OrderDocument): boolean {
+  const key = doc.slotKey ?? '';
+  if (!key || key === 'additional') return false;
+  if (PRIMARY_SLOT_KEYS.has(key as any)) return false;
+  return true;
 }
 
 async function uploadToAdmin(orderId: string, adminId: string, file: File, slotKey: string, title?: string): Promise<{ success: boolean; error?: string }> {
@@ -95,11 +111,14 @@ function PrimaryDocSlot({
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {doc && (
             <>
-              <a href={getViewUrl(doc)} target="_blank" rel="noopener noreferrer"
+              <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="View">
                 <Eye className="w-4 h-4" />
               </a>
-              <button type="button" onClick={() => { void triggerDocumentDownload(doc.url, doc.fileName); }} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="Download"><Download className="w-4 h-4" /></button>
+              <a href={`/api/documents/${doc.id}/view?download=1`} target="_blank" rel="noopener noreferrer"
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="Download">
+                <Download className="w-4 h-4" />
+              </a>
               <button onClick={handleDelete} disabled={deleting}
                 className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50" title="Delete">
                 {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -123,6 +142,46 @@ function PrimaryDocSlot({
   );
 }
 
+// ─── Onboarding submission row ───────────────────────────────────────────────
+
+function OnboardingDocRow({ doc, label, onDelete }: {
+  doc: OrderDocument; label: string; onDelete: (id: string) => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 group">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[#34088f]/5 flex items-center justify-center flex-shrink-0">
+            <FileText className="w-5 h-5 text-[#34088f]" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 font-manrope truncate">{label}</p>
+            <p className="text-xs text-gray-400 font-inter truncate">
+              {doc.fileName}{doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ''}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="View">
+            <Eye className="w-4 h-4" />
+          </a>
+          <a href={`/api/documents/${doc.id}/view?download=1`} target="_blank" rel="noopener noreferrer"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="Download">
+            <Download className="w-4 h-4" />
+          </a>
+          <button onClick={async () => { setDeleting(true); onDelete(doc.id); }}
+            disabled={deleting} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50" title="Delete">
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Additional document row ─────────────────────────────────────────────────
 
 function AdditionalDocRow({ doc, onDelete, onTitleEdit }: {
@@ -133,36 +192,46 @@ function AdditionalDocRow({ doc, onDelete, onTitleEdit }: {
   const [deleting, setDeleting] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:bg-gray-50/50 transition-colors group">
-      <div className="w-9 h-9 rounded-lg bg-[#34088f]/5 flex items-center justify-center flex-shrink-0">
-        <FileText className="w-4 h-4 text-[#34088f]" />
-      </div>
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <div className="flex items-center gap-2">
-            <input value={title} onChange={e => setTitle(e.target.value)}
-              className="flex-1 h-7 px-2 text-xs font-semibold border border-[#34088f] rounded-lg outline-none font-inter" autoFocus />
-            <button onClick={() => { onTitleEdit(doc.id, title); setEditing(false); }}
-              className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Check className="w-3.5 h-3.5" /></button>
-            <button onClick={() => { setTitle(doc.documentType); setEditing(false); }}
-              className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="w-3.5 h-3.5" /></button>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 group">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-[#34088f]/5 flex items-center justify-center flex-shrink-0">
+            <FileText className="w-5 h-5 text-[#34088f]" />
           </div>
-        ) : (
-          <p className="text-xs font-semibold text-gray-900 font-inter truncate">{doc.documentType}</p>
-        )}
-        <p className="text-[10px] text-gray-400 font-inter truncate">{doc.fileName} {doc.fileSize ? `· ${formatBytes(doc.fileSize)}` : ''}</p>
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <a href={getViewUrl(doc)} target="_blank" rel="noopener noreferrer"
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors"><Eye className="w-3.5 h-3.5" /></a>
-        <button type="button" onClick={() => { void triggerDocumentDownload(doc.url, doc.fileName); }}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors"><Download className="w-3.5 h-3.5" /></button>
-        <button onClick={() => setEditing(true)}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
-        <button onClick={async () => { setDeleting(true); onDelete(doc.id); }}
-          disabled={deleting} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50">
-          {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-        </button>
+          <div className="flex-1 min-w-0">
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <input value={title} onChange={e => setTitle(e.target.value)}
+                  className="flex-1 h-7 px-2 text-sm font-semibold border border-[#34088f] rounded-lg outline-none font-inter" autoFocus />
+                <button onClick={() => { onTitleEdit(doc.id, title); setEditing(false); }}
+                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50"><Check className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { setTitle(doc.documentType); setEditing(false); }}
+                  className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ) : (
+              <p className="text-sm font-bold text-gray-900 font-manrope truncate">{doc.documentType}</p>
+            )}
+            <p className="text-xs text-gray-400 font-inter truncate">{doc.fileName}{doc.fileSize ? ` · ${formatBytes(doc.fileSize)}` : ''}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="View">
+            <Eye className="w-4 h-4" />
+          </a>
+          <a href={`/api/documents/${doc.id}/view?download=1`} target="_blank" rel="noopener noreferrer"
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="Download">
+            <Download className="w-4 h-4" />
+          </a>
+          <button onClick={() => setEditing(true)}
+            className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-[#34088f] transition-colors" title="Rename">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button onClick={async () => { setDeleting(true); onDelete(doc.id); }}
+            disabled={deleting} className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50" title="Delete">
+            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -170,7 +239,7 @@ function AdditionalDocRow({ doc, onDelete, onTitleEdit }: {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export function DocumentsTab({ orderId, adminId, documents, onChanged }: DocumentsTabProps) {
+export function DocumentsTab({ orderId, adminId, documents, members, onChanged }: DocumentsTabProps) {
   const [addTitle, setAddTitle] = useState('');
   const [addFile, setAddFile] = useState<File | null>(null);
   const [addUploading, setAddUploading] = useState(false);
@@ -182,7 +251,8 @@ export function DocumentsTab({ orderId, adminId, documents, onChanged }: Documen
     ...slot,
     doc: activeDocs.find(d => d.slotKey === slot.key) ?? null,
   }));
-  const additionalDocs = activeDocs.filter(d => d.slotKey === 'additional' || !PRIMARY_SLOTS.some(s => s.key === d.slotKey));
+  const onboardingDocs = activeDocs.filter(isOnboardingDoc);
+  const additionalDocs = activeDocs.filter(d => d.slotKey === 'additional');
 
   const handleAddUpload = async () => {
     if (!addFile || !addTitle.trim()) { setAddError('Title and file are required'); return; }
@@ -194,18 +264,17 @@ export function DocumentsTab({ orderId, adminId, documents, onChanged }: Documen
     onChanged();
   };
 
-  const handleDeleteAdditional = async (docId: string) => {
+  const handleDelete = async (docId: string) => {
     await deleteDocument(docId, orderId, adminId);
     onChanged();
   };
 
   const handleTitleEdit = async (_docId: string, _newTitle: string) => {
-    // Title stored as document_type — would need a server action; for now refresh
     onChanged();
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Primary Documents */}
       <div>
         <h3 className="text-sm font-black text-gray-900 font-manrope mb-3">Primary Documents</h3>
@@ -220,6 +289,23 @@ export function DocumentsTab({ orderId, adminId, documents, onChanged }: Documen
           ))}
         </div>
       </div>
+
+      {/* Onboarding Submissions */}
+      {onboardingDocs.length > 0 && (
+        <div>
+          <h3 className="text-sm font-black text-gray-900 font-manrope mb-3">Onboarding Submissions</h3>
+          <div className="space-y-2">
+            {onboardingDocs.map(doc => (
+              <OnboardingDocRow
+                key={doc.id}
+                doc={doc}
+                label={getOnboardingLabel(doc, members)}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Additional Documents */}
       <div>
@@ -255,7 +341,7 @@ export function DocumentsTab({ orderId, adminId, documents, onChanged }: Documen
           <div className="space-y-2">
             {additionalDocs.map(doc => (
               <AdditionalDocRow key={doc.id} doc={doc}
-                onDelete={handleDeleteAdditional} onTitleEdit={handleTitleEdit} />
+                onDelete={handleDelete} onTitleEdit={handleTitleEdit} />
             ))}
           </div>
         )}
@@ -263,5 +349,3 @@ export function DocumentsTab({ orderId, adminId, documents, onChanged }: Documen
     </div>
   );
 }
-
-

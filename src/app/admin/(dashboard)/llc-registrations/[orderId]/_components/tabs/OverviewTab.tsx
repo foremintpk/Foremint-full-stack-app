@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
-import { User, MapPin, Package, Users, DollarSign, CreditCard } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { User, MapPin, CreditCard } from 'lucide-react';
 import type { OrderDetail } from '@/types/admin';
+import type { BillingEntry } from '@/lib/admin/actions/addBillingEntry';
 
 interface OverviewTabProps {
   order: OrderDetail;
   internalData: any;
+  billingEntries: BillingEntry[];
 }
 
 function Card({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
@@ -16,7 +18,7 @@ function Card({ title, icon: Icon, children }: { title: string; icon: React.Elem
         <div className="w-8 h-8 rounded-lg bg-[#34088f]/5 flex items-center justify-center flex-shrink-0">
           <Icon className="w-4 h-4 text-[#34088f]" />
         </div>
-        <h3 className="text-sm font-black text-gray-900 font-manrope">{title}</h3>
+        <h3 className="text-base font-black text-gray-900 font-manrope">{title}</h3>
       </div>
       <div className="p-5">{children}</div>
     </div>
@@ -25,52 +27,54 @@ function Card({ title, icon: Icon, children }: { title: string; icon: React.Elem
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-      <span className="text-xs text-gray-500 font-inter">{label}</span>
-      <span className="text-xs font-semibold text-gray-900 font-inter text-right max-w-[60%] truncate">{value || '—'}</span>
+    <div className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+      <span className="text-sm text-gray-500 font-inter">{label}</span>
+      <span className="text-sm font-bold text-gray-900 font-inter text-right max-w-[60%] truncate">{value || '—'}</span>
     </div>
   );
 }
 
-function AmountRow({ label, value, highlight, strike }: { label: string; value: string; highlight?: boolean; strike?: boolean }) {
+function AmountRow({ label, value, highlight, strike, negative, positive }: {
+  label: string; value: string; highlight?: boolean; strike?: boolean; negative?: boolean; positive?: boolean;
+}) {
   return (
-    <div className={`flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0 ${highlight ? 'pt-3 border-t border-gray-200 mt-1' : ''}`}>
-      <span className={`text-xs font-inter ${highlight ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{label}</span>
-      <span className={`text-xs font-manrope ${highlight ? 'text-base font-black text-[#34088f]' : strike ? 'line-through text-gray-400' : 'font-semibold text-gray-900'}`}>
+    <div className={`flex items-center justify-between py-3 border-b border-gray-50 last:border-0 ${highlight ? 'pt-4 border-t-2 border-gray-200 mt-2' : ''}`}>
+      <span className={`text-sm font-inter ${highlight ? 'font-bold text-gray-900' : 'text-gray-500'}`}>{label}</span>
+      <span className={`font-manrope ${
+        highlight  ? 'text-xl font-black text-[#34088f]' :
+        strike     ? 'text-sm line-through text-gray-400' :
+        negative   ? 'text-sm font-semibold text-emerald-600' :
+        positive   ? 'text-sm font-semibold text-red-500' :
+                     'text-sm font-semibold text-gray-900'
+      }`}>
         {value}
       </span>
     </div>
   );
 }
 
-export function OverviewTab({ order, internalData }: OverviewTabProps) {
+export function OverviewTab({ order, internalData: _internalData, billingEntries }: OverviewTabProps) {
   const snapshot = (order.formSnapshot as any) || {};
-
-  // Payment status logic
-  const totalAmount = order.grandTotal;
-  const billing = internalData?.billing;
-  const advancePaid = billing?.advanceAmount ?? 0;
-  const discountPkr = billing?.discountPkr ?? 0;
-  const grandTotalPkr = billing?.grandTotalPkr ?? 0;
-  const secondPayment = billing?.secondPaymentAmount ?? 0;
-
-  // Coupon
-  const coupon = snapshot?.coupon ?? snapshot?.step7?.coupon ?? null;
-  const couponDiscount = Number(coupon?.discountAmount ?? 0);
+  const couponDiscount = Number(snapshot?.coupon?.discountAmount ?? snapshot?.step7?.coupon?.discountAmount ?? 0);
   const addonsTotal = order.addonsTotal ?? 0;
 
-  // Pending amount (USD)
-  let paymentStatus: 'Paid' | 'Unpaid' | 'Partially Paid' = 'Unpaid';
-  if (order.paymentStatus === 'paid') paymentStatus = 'Paid';
-  else if (order.paymentStatus === 'partial') paymentStatus = 'Partially Paid';
+  const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
-  const paymentStatusStyles: Record<string, string> = {
-    'Paid':           'bg-emerald-100 text-emerald-700',
-    'Unpaid':         'bg-red-100 text-red-700',
-    'Partially Paid': 'bg-amber-100 text-amber-700',
-  };
+  const { chargesTotal, discountsTotal, paymentsTotal, pendingAmount, isPaid } = useMemo(() => {
+    let charges = 0, discounts = 0, payments = 0;
+    for (const e of billingEntries) {
+      if (e.type === 'charge') charges += e.amount;
+      else if (e.type === 'discount') discounts += e.amount;
+      else if (e.type === 'payment') payments += e.amount;
+    }
+    const effective = order.grandTotal + charges - discounts;
+    const pending = Math.max(0, effective - payments);
+    return { chargesTotal: charges, discountsTotal: discounts, paymentsTotal: payments, pendingAmount: pending, isPaid: pending <= 0 };
+  }, [billingEntries, order.grandTotal]);
 
-  const usdFormatter = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  const paymentBadge = isPaid
+    ? { label: 'Paid', style: 'bg-emerald-100 text-emerald-700' }
+    : { label: `Unpaid · ${fmt(pendingAmount)}`, style: 'bg-red-100 text-red-700' };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -92,7 +96,7 @@ export function OverviewTab({ order, internalData }: OverviewTabProps) {
         <Row label="Submitted"        value={order.submittedAt ? new Date(order.submittedAt).toLocaleDateString() : undefined} />
       </Card>
 
-      {/* Payment Summary — full width */}
+      {/* Payment Details — full width */}
       <div className="lg:col-span-2">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
@@ -100,33 +104,54 @@ export function OverviewTab({ order, internalData }: OverviewTabProps) {
               <div className="w-8 h-8 rounded-lg bg-[#34088f]/5 flex items-center justify-center">
                 <CreditCard className="w-4 h-4 text-[#34088f]" />
               </div>
-              <h3 className="text-sm font-black text-gray-900 font-manrope">Payment Details</h3>
+              <h3 className="text-base font-black text-gray-900 font-manrope">Payment Details</h3>
             </div>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${paymentStatusStyles[paymentStatus]}`}>
-              {paymentStatus}
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${paymentBadge.style}`}>
+              {paymentBadge.label}
             </span>
           </div>
 
-          <div className="p-5 max-w-md">
-            <AmountRow label="Package Fee"          value={usdFormatter(order.packagePrice)} />
-            <AmountRow label="Add-ons Total"        value={usdFormatter(addonsTotal)} />
-            <AmountRow label="State Fee"            value={usdFormatter(order.stateFee)} />
+          <div className="p-5">
+            {/* Base fees */}
+            <AmountRow label="Package Fee"        value={fmt(order.packagePrice)} />
+            <AmountRow label="Add-ons Total"      value={fmt(addonsTotal)} />
+            <AmountRow label="State Fee"          value={fmt(order.stateFee)} />
             {couponDiscount > 0 && (
-              <AmountRow label="Coupon Discount"    value={`-${usdFormatter(couponDiscount)}`} strike />
+              <AmountRow label="Coupon Discount"  value={`-${fmt(couponDiscount)}`} strike />
             )}
-            {discountPkr > 0 && (
-              <AmountRow label="Additional Discount" value={`Rs. ${discountPkr.toLocaleString()}`} strike />
+            <AmountRow label="Base Total (USD)"   value={fmt(order.grandTotal)} highlight />
+
+            {/* Billing entry adjustments */}
+            {billingEntries.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 font-inter">Billing Adjustments</p>
+                {billingEntries.map(e => (
+                  <AmountRow
+                    key={e.id}
+                    label={e.title}
+                    value={e.type === 'charge' ? `+${fmt(e.amount)}` : `-${fmt(e.amount)}`}
+                    positive={e.type === 'charge'}
+                    negative={e.type !== 'charge'}
+                  />
+                ))}
+                {chargesTotal > 0 && (
+                  <AmountRow label="Additional Charges" value={`+${fmt(chargesTotal)}`} positive />
+                )}
+                {discountsTotal > 0 && (
+                  <AmountRow label="Applied Discounts"  value={`-${fmt(discountsTotal)}`} negative />
+                )}
+                {paymentsTotal > 0 && (
+                  <AmountRow label="Payments Received"  value={`-${fmt(paymentsTotal)}`} negative />
+                )}
+              </div>
             )}
-            {advancePaid > 0 && (
-              <AmountRow label="Advance Paid (PKR)" value={`Rs. ${advancePaid.toLocaleString()}`} />
-            )}
-            {secondPayment > 0 && (
-              <AmountRow label="Second Payment"     value={`Rs. ${secondPayment.toLocaleString()}`} />
-            )}
-            <AmountRow label="Total Amount (USD)"  value={usdFormatter(totalAmount)} highlight />
-            {grandTotalPkr > 0 && (
-              <AmountRow label="Total Amount (PKR)" value={`Rs. ${grandTotalPkr.toLocaleString()}`} highlight />
-            )}
+
+            {/* Pending amount — always shown */}
+            <AmountRow
+              label="Pending Amount"
+              value={isPaid ? 'Paid in Full' : fmt(pendingAmount)}
+              highlight
+            />
           </div>
         </div>
       </div>

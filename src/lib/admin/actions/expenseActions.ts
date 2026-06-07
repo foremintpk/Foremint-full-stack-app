@@ -11,16 +11,17 @@ export async function createExpense(formData: FormData): Promise<{ error?: strin
     const supabase = await createClient();
     
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator' && profile?.role !== 'manager') {
+    if (profile?.is_active !== true || (profile?.role !== 'administrator' && profile?.role !== 'manager')) {
       return { error: 'Insufficient permissions' };
     }
 
@@ -70,16 +71,17 @@ export async function updateExpense(id: string, formData: FormData): Promise<{ e
     const supabase = await createClient();
     
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator' && profile?.role !== 'manager') {
+    if (profile?.is_active !== true || (profile?.role !== 'administrator' && profile?.role !== 'manager')) {
       return { error: 'Insufficient permissions' };
     }
 
@@ -129,16 +131,17 @@ export async function deleteExpense(id: string): Promise<{ error?: string }> {
     const supabase = await createClient();
     
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator') {
+    if (profile?.is_active !== true || profile?.role !== 'administrator') {
       return { error: 'Only administrators can delete expenses' };
     }
 
@@ -169,16 +172,17 @@ export async function createExpenseCategory(formData: FormData): Promise<{ error
   try {
     const supabase = await createClient();
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator' && profile?.role !== 'manager') {
+    if (profile?.is_active !== true || (profile?.role !== 'administrator' && profile?.role !== 'manager')) {
       return { error: 'Insufficient permissions' };
     }
 
@@ -217,16 +221,17 @@ export async function updateExpenseCategory(id: string, formData: FormData): Pro
   try {
     const supabase = await createClient();
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator' && profile?.role !== 'manager') {
+    if (profile?.is_active !== true || (profile?.role !== 'administrator' && profile?.role !== 'manager')) {
       return { error: 'Insufficient permissions' };
     }
 
@@ -266,16 +271,17 @@ export async function deleteExpenseCategory(id: string): Promise<{ error?: strin
   try {
     const supabase = await createClient();
     
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: claimsData } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (!user) return { error: 'Unauthorized' };
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, is_active')
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'administrator') {
+    if (profile?.is_active !== true || profile?.role !== 'administrator') {
       return { error: 'Only administrators can delete categories' };
     }
 

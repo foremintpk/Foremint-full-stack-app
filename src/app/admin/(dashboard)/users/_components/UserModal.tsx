@@ -177,6 +177,7 @@ export function UserModal({ mode, user, onClose }: UserModalProps): React.JSX.El
                 className="appearance-none w-full h-10 pl-4 pr-10 bg-white border border-[#e0d9f7] rounded-full text-sm text-[#374151] cursor-pointer outline-none focus:border-[#34088f] focus:ring-2 focus:ring-[#34088f]/20 transition-all font-inter"
               >
                 <option value="customer">Customer</option>
+                <option value="b2b_customer">B2B Customer</option>
                 <option value="manager">Manager</option>
                 <option value="administrator">Administrator</option>
               </select>

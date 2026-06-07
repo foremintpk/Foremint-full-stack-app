@@ -47,9 +47,11 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         `)
         .eq('id', orderId)
         .single(),
-      (client as any)
+      adminSdk
         .from('documents')
-        .select('*'),
+        .select('*')
+        .eq('order_id', orderId)
+        .order('uploaded_at', { ascending: false }),
       (client as any)
         .from('order_status_history')
         .select(`
@@ -78,13 +80,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     const order = orderRes.data as any;
     const clientProfile = order.profiles as any;
 
-    const allDocs = (docsRes.data || []) as Array<Record<string, unknown>>;
-    const clientDocs = allDocs.filter(d => {
-      if (d.profile_id !== order.user_id) return false;
-      if (d.order_id === orderId) return true;
-      if (!d.order_id && !d.superseded_at) return true;
-      return false;
-    });
+    // Already filtered by order_id and sorted uploaded_at DESC from the query
+    const clientDocs = (docsRes.data || []) as Array<Record<string, unknown>>;
 
     await hydrateSupabaseDocumentUrls(clientDocs as any[], adminSdk);
 
@@ -102,6 +99,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       storagePath: (doc.storage_path as string) ?? null,
       supersededAt: (doc.superseded_at as string) ?? null,
       isActive: !doc.superseded_at,
+      cloudinaryResourceType: (doc.cloudinary_resource_type as string) ?? null,
     }));
 
     // Map status history to OrderStatusHistory types
@@ -165,6 +163,8 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         city: (m.city as string) ?? '',
         state: (m.state as string) ?? '',
         country: (m.country as string) ?? '',
+        ssnItin: (m.ssnItin as string) ?? (m.ssn as string) ?? null,
+        idDocId: activeDoc?.id ?? null,
         idDocUrl: activeDoc?.url ?? snapshotUrl,
         hasResubmitRequest,
       };
@@ -187,10 +187,22 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       formSnapshot?.selectedPackageId ??
       formSnapshot?.formationPackage ??
       null;
-    const formationPackageName =
+    let formationPackageName: string | null =
       formSnapshot?.step2?.packageName ??
       formSnapshot?.selectedPackageName ??
       null;
+
+    if (!formationPackageName && formationPackage) {
+      const uuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidLike.test(formationPackage)) {
+        const { data: pkgRow } = await client
+          .from('packages')
+          .select('name')
+          .eq('id', formationPackage)
+          .maybeSingle();
+        formationPackageName = (pkgRow as { name?: string } | null)?.name ?? null;
+      }
+    }
 
     return {
       id: order.id,
@@ -228,6 +240,10 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
       statusHistory,
       resubmissionRequests,
       formSnapshot,
+      companyDetails: null,
+      internalAddons: [],
+      billingEntries: [],
+      couponDiscount: 0,
     };
   };
 

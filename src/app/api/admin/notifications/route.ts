@@ -20,19 +20,20 @@ export async function GET(req: NextRequest) {
 
     // Verify session
     const {
-      data: { user },
+      data: claimsData,
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getClaims();
+    const user = claimsData?.claims;
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Query active profile role
+    // Query active profile role and active status
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
-      .eq('id', user.id)
+      .select('role, is_active')
+      .eq('id', user.sub)
       .single();
 
     if (profileError || !profile) {
@@ -40,12 +41,12 @@ export async function GET(req: NextRequest) {
     }
 
     const role = profile.role;
-    if (role !== 'administrator' && role !== 'manager') {
+    if ((role !== 'administrator' && role !== 'manager') || profile.is_active !== true) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Fetch notifications using the server unstable_cache wrapper
-    const items = await getCachedUnreadNotifications(user.id, role);
+    const items = await getCachedUnreadNotifications(user.sub, role);
 
     const response = NextResponse.json({
       count: items.length,

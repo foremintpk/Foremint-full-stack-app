@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getDashboardData } from '@/lib/dashboard/getDashboardData';
+import { isB2BRole } from '@/lib/auth/get-session';
+import { fetchCustomerNotifications } from '@/lib/dashboard/customerNotifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,29 +11,36 @@ export async function GET() {
 
     // Verify session
     const {
-      data: { user },
+      data: claimsData,
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getClaims();
+    const user = claimsData?.claims;
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Query active profile to get the user's name
+    // Only the role is needed here (to pick the same B2B vs. regular notification
+    // scope fetchDashboardDataQuery uses) — no need to load the full profile row
+    // or run the rest of the dashboard pipeline just to read notifications.
     const { data: profile } = await supabase
       .from('profiles')
-      .select('full_name, email')
-      .eq('id', user.id)
+      .select('role')
+      .eq('id', user.sub)
       .single();
 
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    // Fetch dashboard data (which includes notifications list)
-    const dashboardData = await getDashboardData(user.id, profile.full_name || '');
+    const notifications = await fetchCustomerNotifications(
+      supabase,
+      user.sub,
+      isB2BRole(profile.role),
+      'notifications-route:query'
+    );
 
-    const unreadNotifications = dashboardData.notifications.filter((n) => !n.isRead);
+    const unreadNotifications = notifications.filter((n) => !n.isRead);
 
     const response = NextResponse.json({
       count: unreadNotifications.length,

@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import type { Database } from '@/types/database'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { validateCoupon } from '@/lib/onboarding/coupons'
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function POST(req: NextRequest) {
   try {
     const supabaseServer = await createServerClient()
-    const { data: { user } } = await supabaseServer.auth.getUser()
+    const { data: claimsData } = await supabaseServer.auth.getClaims()
+    const user = claimsData?.claims
 
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
@@ -20,10 +17,10 @@ export async function POST(req: NextRequest) {
     const code = body.code?.trim() || ''
     const subtotal = Number(body.subtotal || 0)
 
-    const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const supabase = createAdminClient()
     const result = await validateCoupon(supabase, {
       code,
-      userId: user.id,
+      userId: user.sub,
       subtotal,
     })
 

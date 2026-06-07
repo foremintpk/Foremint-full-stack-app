@@ -5,6 +5,7 @@ import { CreditCard, Building2, Check, TicketPercent, X, Loader2 } from 'lucide-
 import { BankTransferDetails } from '../payment/BankTransferDetails'
 import { PaymentReceiptUpload } from '../payment/PaymentReceiptUpload'
 import { OrderSummaryBar } from '../ui/OrderSummaryBar'
+import { useOnboarding } from '@/context/onboarding-context'
 import type { OnboardingFormData } from '@/types/onboarding'
 
 interface PaymentStepProps {
@@ -13,6 +14,7 @@ interface PaymentStepProps {
 }
 
 export function PaymentStep({ formData, onChange }: PaymentStepProps) {
+  const { setShowAccountPopup } = useOnboarding()
   const addonTotal = formData.addonTotal ?? 0
   const subtotal = formData.stateFee + formData.packagePrice + addonTotal
   const couponDiscount = Math.max(0, formData.couponDiscountAmount ?? 0)
@@ -74,7 +76,12 @@ export function PaymentStep({ formData, onChange }: PaymentStepProps) {
       }
 
       if (!res.ok || !data.success || !data.coupon) {
-        setCouponError(data.error || 'Invalid coupon code.')
+        if (res.status === 401) {
+          setCouponError('Please create an account or sign in to apply a coupon.')
+          setShowAccountPopup(true)
+        } else {
+          setCouponError(data.error || 'Invalid coupon code.')
+        }
         onChange({
           couponCode: null,
           couponId: null,

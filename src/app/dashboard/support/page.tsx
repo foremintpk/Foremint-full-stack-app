@@ -6,6 +6,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth/get-session';
 import { createClient } from '@/lib/supabase/server';
+import { time } from '@/lib/perf';
 import SupportClient from './SupportClient';
 
 export const dynamic = 'force-dynamic';
@@ -20,8 +21,13 @@ export default async function SupportPage() {
 
   const supabase = await createClient();
 
-  // Fetch user's support tickets with latest message preview
-  const { data: queriesRaw } = await supabase
+  // Fetch user's support tickets with latest message preview.
+  // NOTE: tickets and their messages are fetched in a SINGLE nested-select roundtrip
+  // (query_messages embedded via the orders→queries→query_messages FK) — there is no
+  // separate "message loader" query for this route. Labeled to reflect that for
+  // accurate attribution (live message updates arrive via Realtime broadcast, not a
+  // server-side fetch — see SupportClient's `ticket-${id}` channel).
+  const { data: queriesRaw } = await time<any>('support:queries+messages query (single nested select)', () => supabase
     .from('queries')
     .select(`
       id,
@@ -38,7 +44,7 @@ export default async function SupportPage() {
       )
     `)
     .eq('user_id', session.user.id)
-    .order('updated_at', { ascending: false });
+    .order('updated_at', { ascending: false }));
 
   const queries = (queriesRaw || []).map((q: any) => ({
     id: q.id,

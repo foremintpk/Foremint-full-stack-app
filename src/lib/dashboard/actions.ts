@@ -6,6 +6,7 @@ import { createClient as createRawClient } from '@supabase/supabase-js';
 import { revalidateTag as nextRevalidateTag } from 'next/cache';
 const revalidateTag = nextRevalidateTag as any;
 import { getSession } from '@/lib/auth/get-session';
+import { sendAdminReceiptUploadedEmail } from '@/lib/email/sendOrderConfirmation';
 import type { UpdateEmailResult, UpdatePasswordResult } from '@/types/admin';
 
 // Helper stateless verify client (no SSR cookies written)
@@ -321,7 +322,7 @@ export async function submitBankTransferReceipt(
     // Verify order
     const { data: order, error: orderCheckErr } = await supabase
       .from('orders')
-      .select('id, user_id, order_number')
+      .select('id, user_id, order_number, form_snapshot, formation_state_name, formation_state, grand_total')
       .eq('id', orderId)
       .eq('user_id', userId)
       .single();
@@ -370,16 +371,33 @@ export async function submitBankTransferReceipt(
       return { success: false, error: orderUpdateErr.message };
     }
 
-    // 4. Send admin notification
+    // 4. Send admin notification (in-app)
     const clientName = session.profile.full_name || session.profile.email;
+    const snapshot = (order as any).form_snapshot || {};
+    const businessName =
+      snapshot?.step3?.businessName ||
+      snapshot?.businessName ||
+      `Order ${order.order_number || order.id.slice(0, 8)}`;
+
     await supabase.from('notifications').insert({
       type: 'receipt_uploaded',
       target_role: 'administrator',
       title: 'Payment Proof Uploaded',
-      body: `Customer ${clientName} uploaded a bank transfer receipt for order #${order.order_number || order.id.slice(0, 8)}`,
+      body: `${clientName} uploaded a bank transfer receipt for ${businessName} (#${order.order_number || order.id.slice(0, 8)})`,
       link: `/admin/llc-registrations/${orderId}`,
       is_read: false,
     });
+
+    // 4b. Email the admin (fire-and-forget — never blocks the upload)
+    sendAdminReceiptUploadedEmail({
+      customerName: clientName,
+      customerEmail: session.profile.email,
+      businessName,
+      orderId,
+      orderNumber: order.order_number || order.id.slice(0, 8),
+      formationState: (order as any).formation_state_name || (order as any).formation_state || undefined,
+      pendingAmount: Number((order as any).grand_total || 0) || undefined,
+    }).catch((err) => console.error('[submitBankTransferReceipt email error]', err));
 
     // 5. Invalidate caches
     revalidateTag(`order-${orderId}`, 'max');

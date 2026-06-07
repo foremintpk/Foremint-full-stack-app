@@ -100,6 +100,7 @@ export async function getOrderInternalData(orderId: string): Promise<OrderIntern
       storagePath: doc.storage_path || null,
       supersededAt: doc.superseded_at || null,
       isActive: !doc.superseded_at,
+      cloudinaryResourceType: doc.cloudinary_resource_type || null,
     }));
 
     const { data: internalAddonsRes } = await (supabase as any)

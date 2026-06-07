@@ -31,10 +31,10 @@ export async function POST(
 
     const supabase = await createClient();
 
-    // 1. Enforce admin/manager role authorization
+    // 1. Only administrators may upload documents
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (roleError || role !== 'administrator') {
+      return NextResponse.json({ error: 'Forbidden: Administrator role required' }, { status: 403 });
     }
 
     // 2. Fetch order to link the document to order owner (profile_id)

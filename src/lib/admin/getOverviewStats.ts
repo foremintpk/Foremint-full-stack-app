@@ -1,21 +1,7 @@
-/**
- * @file src/lib/admin/getOverviewStats.ts
- * @description Highly optimized parallel database analytics query with a multi-layered server-side caching design.
- *
- * 1. Server vs Client choice rationale: Server side cached queries.
- * 2. Caching layer: Layer 1 + 2 - unstable_cache with a 120s TTL and cache() request deduplication.
- * 3. RBAC: Constrained to authenticated managers and administrators.
- * 4. Revalidation / Cache Busting: Manual refresh tags ('overview-stats', 'overview-earnings', 'overview-stats-{rangeKey}').
- *
- * FIX (Next.js 15+): cookies() must NOT be called inside unstable_cache().
- * createClient() is now called OUTSIDE the cache boundary and the client
- * is passed into the inner async fn via closure — not as a cache key arg.
- */
-
 import { cache } from 'react';
 import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { OverviewStats, DateRangeFilter } from '@/types/admin';
+import { OverviewStats, DateRangeFilter, DailyTrendPoint } from '@/types/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
@@ -25,50 +11,57 @@ async function fetchOverviewStats(
   start: string,
   end: string
 ): Promise<OverviewStats> {
-  const [llcRes, paypalRes, revenueRes] = await Promise.all([
-    (async () => {
-      const result = await supabase
+  const [llcRes, paypalRes, llcRevenueRes, paypalRevenueRes, invoiceRes] = await Promise.all([
+    supabase
       .from('orders')
-      .select('status')
+      .select('status, created_at')
       .eq('order_type', 'llc')
       .gte('created_at', start)
-      .lte('created_at', end);
-      return result;
-    })(),
-    (async () => {
-      const result = await supabase
-      .from('orders')
-      .select('status')
-      .eq('order_type', 'paypal')
+      .lte('created_at', end),
+
+    supabase
+      .from('paypal_orders')
+      .select('status, deal_amount, created_at')
       .gte('created_at', start)
-      .lte('created_at', end);
-      return result;
-    })(),
-    (async () => {
-      const result = await supabase
+      .lte('created_at', end),
+
+    supabase
       .from('orders')
-      .select('order_type, grand_total')
+      .select('grand_total, created_at')
+      .eq('order_type', 'llc')
       .eq('payment_status', 'paid')
       .gte('created_at', start)
-      .lte('created_at', end);
-      return result;
-    })(),
+      .lte('created_at', end),
+
+    supabase
+      .from('paypal_orders')
+      .select('deal_amount, created_at')
+      .eq('status', 'completed')
+      .gte('created_at', start)
+      .lte('created_at', end),
+
+    supabase
+      .from('invoices')
+      .select('commission_earned, created_at')
+      .gte('created_at', start)
+      .lte('created_at', end),
   ]);
 
   if (llcRes.error) console.error('Error fetching LLC stats:', llcRes.error);
   if (paypalRes.error) console.error('Error fetching PayPal stats:', paypalRes.error);
-  if (revenueRes.error) console.error('Error fetching Revenue stats:', revenueRes.error);
+  if (llcRevenueRes.error) console.error('Error fetching LLC revenue:', llcRevenueRes.error);
+  if (paypalRevenueRes.error) console.error('Error fetching PayPal revenue:', paypalRevenueRes.error);
+  if (invoiceRes.error) console.error('Error fetching Invoice stats:', invoiceRes.error);
 
   const llcOrders = llcRes.data || [];
   const paypalOrders = paypalRes.data || [];
-  const revenueData = revenueRes.data || [];
+  const llcRevenueData = llcRevenueRes.data || [];
+  const paypalRevenueData = paypalRevenueRes.data || [];
+  const invoiceData = invoiceRes.data || [];
 
-  // 1. Map and accumulate LLC order counts
+  // 1. LLC order counts
   const llcTotal = llcOrders.length;
-  let llcPending = 0;
-  let llcProcessing = 0;
-  let llcCompleted = 0;
-
+  let llcPending = 0, llcProcessing = 0, llcCompleted = 0;
   llcOrders.forEach((o) => {
     const s = o.status as string;
     if (s === 'pending') llcPending++;
@@ -76,12 +69,9 @@ async function fetchOverviewStats(
     else if (s === 'completed') llcCompleted++;
   });
 
-  // 2. Map and accumulate PayPal order counts
+  // 2. PayPal order counts
   const paypalTotal = paypalOrders.length;
-  let paypalPending = 0;
-  let paypalProcessing = 0;
-  let paypalCompleted = 0;
-
+  let paypalPending = 0, paypalProcessing = 0, paypalCompleted = 0;
   paypalOrders.forEach((o) => {
     const s = o.status as string;
     if (s === 'pending') paypalPending++;
@@ -89,33 +79,18 @@ async function fetchOverviewStats(
     else if (s === 'completed') paypalCompleted++;
   });
 
-  // 3. Map and accumulate Revenues
-  let llcRevenue = 0;
-  let paypalRevenue = 0;
-  const invoiceCommissions = 0; // TODO: Pull from Invoices table once Chunk 4F is implemented
-
-  revenueData.forEach((r) => {
-    const amt = Number(r.grand_total) || 0;
-    if (r.order_type === 'llc') {
-      llcRevenue += amt;
-    } else if (r.order_type === 'paypal') {
-      paypalRevenue += amt;
-    }
-  });
-
+  // 3. Revenue totals
+  const llcRevenue = llcRevenueData.reduce((sum, r) => sum + (Number(r.grand_total) || 0), 0);
+  const paypalRevenue = paypalRevenueData.reduce((sum, r) => sum + (Number(r.deal_amount) || 0), 0);
+  const invoiceCommissions = invoiceData.reduce((sum, r) => sum + (Number(r.commission_earned) || 0), 0);
   const totalEarnings = llcRevenue + paypalRevenue + invoiceCommissions;
 
-  // 4. Compute Contribution Percentages
-  let llcPercent = 0;
-  let paypalPercent = 0;
-  let invoicePercent = 0;
-
+  // 4. Percentages
+  let llcPercent = 0, paypalPercent = 0, invoicePercent = 0;
   if (totalEarnings > 0) {
     llcPercent = Math.round((llcRevenue / totalEarnings) * 100);
     paypalPercent = Math.round((paypalRevenue / totalEarnings) * 100);
     invoicePercent = Math.round((invoiceCommissions / totalEarnings) * 100);
-
-    // Adjust rounding errors so the total sum always matches exactly 100%
     const sum = llcPercent + paypalPercent + invoicePercent;
     if (sum !== 100 && sum > 0) {
       const diff = 100 - sum;
@@ -126,28 +101,60 @@ async function fetchOverviewStats(
     }
   }
 
+  // 5. Daily trend — group all records by YYYY-MM-DD
+  const trendMap = new Map<string, DailyTrendPoint>();
+
+  const getOrCreate = (date: string): DailyTrendPoint => {
+    if (!trendMap.has(date)) {
+      trendMap.set(date, { date, llcOrders: 0, paypalOrders: 0, totalRevenue: 0 });
+    }
+    return trendMap.get(date)!;
+  };
+
+  llcOrders.forEach((o) => {
+    const d = (o.created_at as string).split('T')[0];
+    getOrCreate(d).llcOrders++;
+  });
+
+  paypalOrders.forEach((o) => {
+    const d = (o.created_at as string).split('T')[0];
+    getOrCreate(d).paypalOrders++;
+  });
+
+  llcRevenueData.forEach((o) => {
+    const d = (o.created_at as string).split('T')[0];
+    getOrCreate(d).totalRevenue += Number(o.grand_total) || 0;
+  });
+
+  paypalRevenueData.forEach((o) => {
+    const d = (o.created_at as string).split('T')[0];
+    getOrCreate(d).totalRevenue += Number(o.deal_amount) || 0;
+  });
+
+  invoiceData.forEach((o) => {
+    const d = (o.created_at as string).split('T')[0];
+    getOrCreate(d).totalRevenue += Number(o.commission_earned) || 0;
+  });
+
+  // Fill in missing days in the range so the chart shows a continuous x-axis
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const current = new Date(startDate);
+  while (current <= endDate) {
+    const d = current.toISOString().split('T')[0];
+    getOrCreate(d);
+    current.setDate(current.getDate() + 1);
+  }
+
+  const dailyTrend = Array.from(trendMap.values()).sort((a, b) =>
+    a.date.localeCompare(b.date)
+  );
+
   return {
-    llc: {
-      total: llcTotal,
-      pending: llcPending,
-      processing: llcProcessing,
-      completed: llcCompleted,
-    },
-    paypal: {
-      total: paypalTotal,
-      pending: paypalPending,
-      processing: paypalProcessing,
-      completed: paypalCompleted,
-    },
-    earnings: {
-      llcRevenue,
-      paypalRevenue,
-      invoiceCommissions,
-      totalEarnings,
-      llcPercent,
-      paypalPercent,
-      invoicePercent,
-    },
+    llc: { total: llcTotal, pending: llcPending, processing: llcProcessing, completed: llcCompleted },
+    paypal: { total: paypalTotal, pending: paypalPending, processing: paypalProcessing, completed: paypalCompleted },
+    earnings: { llcRevenue, paypalRevenue, invoiceCommissions, totalEarnings, llcPercent, paypalPercent, invoicePercent },
+    dailyTrend,
     rangeKey,
     fetchedAt: new Date().toISOString(),
   };
@@ -172,6 +179,5 @@ export async function getCachedOverviewStats(
   )(rangeKey, startDateStr, endDateStr);
 }
 
-// Request-level memoized wrapper
 export const getOverviewStats = cache(getCachedOverviewStats);
 export { DATE_RANGES } from './dateRanges';

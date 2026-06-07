@@ -11,6 +11,7 @@ interface DashboardShellProps {
   profile: Profile;
   initialNotifications: CustomerNotification[];
   initialLlcNames: Record<string, string>;
+  isB2B?: boolean;
   badgeCounts: {
     notifications: number;
     actions: number;
@@ -22,6 +23,7 @@ export function DashboardShell({
   profile,
   initialNotifications,
   initialLlcNames,
+  isB2B = false,
   badgeCounts,
   children,
 }: DashboardShellProps) {
@@ -44,7 +46,7 @@ export function DashboardShell({
       <div className="flex h-screen w-screen overflow-hidden bg-gray-50 font-inter">
         {/* Desktop Sidebar (hidden on mobile, visible on lg) */}
         <div className="hidden lg:relative lg:flex lg:flex-shrink-0 lg:overflow-visible">
-          <CustomerSidebar badgeCounts={liveBadgeCounts} />
+          <CustomerSidebar badgeCounts={liveBadgeCounts} isB2B={isB2B} />
         </div>
 
         {/* Mobile Navigation Drawer Overlay */}
@@ -64,7 +66,7 @@ export function DashboardShell({
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <CustomerSidebar badgeCounts={liveBadgeCounts} />
+                <CustomerSidebar badgeCounts={liveBadgeCounts} isB2B={isB2B} />
               </div>
             </div>
             {/* Clickable rest of the screen to close */}

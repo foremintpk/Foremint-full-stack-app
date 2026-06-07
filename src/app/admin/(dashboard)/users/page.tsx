@@ -42,7 +42,7 @@ export default async function UsersPage({ searchParams }: PageProps) {
   let role: UserRole | 'all' = 'all';
   if (
     resolvedParams.role &&
-    ['administrator', 'manager', 'customer'].includes(resolvedParams.role)
+    ['administrator', 'manager', 'customer', 'b2b_customer'].includes(resolvedParams.role)
   ) {
     role = resolvedParams.role as UserRole;
   }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit2, Save, X, Building, FileSignature, MapPin, Info } from 'lucide-react';
+import { Edit2, Save, X, FileSignature, Info } from 'lucide-react';
 import { updateFormationInfo } from '@/lib/admin/actions/updateFormationInfo';
 import { updateFormationDetails } from '@/lib/admin/actions/updateFormationDetails';
 import { US_STATES } from '@/lib/onboarding-data';
@@ -279,7 +279,7 @@ export function FormationDetailsTab({
               <ReadField label="Filing ID"         value={filingId} />
               <ReadField label="Formation Date"    value={formationDate} />
               <ReadField label="Renewal Date"      value={renewalDate} />
-              <ReadField label="Renewal Fee (PKR)" value={renewalFee ? `Rs. ${Number(renewalFee).toLocaleString()}` : undefined} />
+              <ReadField label="Renewal Fee (USD)" value={renewalFee ? `$${Number(renewalFee).toLocaleString()}` : undefined} />
             </div>
             <div className="border-t border-gray-100 pt-5">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4 font-inter">Addresses</p>
@@ -297,7 +297,7 @@ export function FormationDetailsTab({
               <Field label="Filing ID"><input className={INPUT_CLS} value={filingId} onChange={e => setFilingId(e.target.value)} /></Field>
               <Field label="Formation Date"><input className={INPUT_CLS} type="date" value={formationDate} onChange={e => setFormationDate(e.target.value)} /></Field>
               <Field label="Renewal Date"><input className={INPUT_CLS} type="date" value={renewalDate} onChange={e => setRenewalDate(e.target.value)} /></Field>
-              <Field label="Renewal Fee (PKR)"><input className={INPUT_CLS} type="number" value={renewalFee} onChange={e => setRenewalFee(e.target.value)} /></Field>
+              <Field label="Renewal Fee (USD)"><input className={INPUT_CLS} type="number" value={renewalFee} onChange={e => setRenewalFee(e.target.value)} /></Field>
             </div>
             <div className="border-t border-gray-100 pt-5">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-4 font-inter">Addresses</p>

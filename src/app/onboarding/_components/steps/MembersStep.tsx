@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { MemberForm } from '../members/MemberForm'
+import { generateUuid } from '@/lib/onboarding-utils'
 import type { OnboardingFormData, OnboardingMember } from '@/types/onboarding'
 
 interface MembersStepProps {
@@ -12,7 +13,7 @@ interface MembersStepProps {
 
 function createMember(index: number, isMultiMember: boolean): OnboardingMember {
   return {
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     fullName: '',
     ssnItin: '',
     addressLine1: '',

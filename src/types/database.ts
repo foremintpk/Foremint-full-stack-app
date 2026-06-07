@@ -172,6 +172,45 @@ export type Database = {
           },
         ]
       }
+      b2b_order_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          b2b_user_id: string
+          id: string
+          order_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          b2b_user_id: string
+          id?: string
+          order_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          b2b_user_id?: string
+          id?: string
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "b2b_order_assignments_b2b_user_id_fkey"
+            columns: ["b2b_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "b2b_order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           business_address: Json | null
@@ -1406,7 +1445,7 @@ export type Database = {
         | "refunded"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
-      user_role: "administrator" | "manager" | "customer"
+      user_role: "administrator" | "manager" | "customer" | "b2b_customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1571,7 +1610,7 @@ export const Constants = {
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],
       storage_provider: ["supabase", "cloudinary"],
-      user_role: ["administrator", "manager", "customer"],
+      user_role: ["administrator", "manager", "customer", "b2b_customer"],
     },
   },
 } as const

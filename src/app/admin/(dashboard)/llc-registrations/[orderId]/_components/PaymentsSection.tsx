@@ -64,6 +64,7 @@ export function PaymentsSection({
   const displayFileName =
     matchingDoc?.fileName ?? receiptFileNameFromSnapshot(order.formSnapshot);
   const documentId = matchingDoc?.id ?? null;
+  const docViewUrl = documentId ? `/api/documents/${documentId}/view` : null;
 
   const hasReceipt = !!previewUrl;
   const isDeleted =
@@ -203,8 +204,7 @@ export function PaymentsSection({
               />
 
               <DocumentActionButtons
-                url={previewUrl}
-                fileName={displayFileName}
+                docId={documentId}
                 onPreview={() => setShowPreviewModal(true)}
                 previewLabel="Preview Receipt"
                 downloadLabel="Download"
@@ -269,9 +269,9 @@ export function PaymentsSection({
             </div>
 
             <div className="w-full h-[50vh] flex items-center justify-center bg-gray-50 border border-[#ebebeb] overflow-hidden relative">
-              {isImageUrl(previewUrl, matchingDoc?.mimeType) ? (
+              {isImageUrl('', matchingDoc?.mimeType) ? (
                 <img
-                  src={previewUrl}
+                  src={docViewUrl ?? ''}
                   alt="Payment receipt preview"
                   className="max-w-full max-h-full object-contain"
                 />
@@ -282,8 +282,7 @@ export function PaymentsSection({
                     Interactive preview is only available for images.
                   </p>
                   <DocumentActionButtons
-                    url={previewUrl}
-                    fileName={displayFileName}
+                    docId={documentId}
                     downloadLabel="Download Receipt"
                   />
                 </div>
@@ -292,8 +291,7 @@ export function PaymentsSection({
 
             <div className="flex items-center justify-end gap-2">
               <DocumentActionButtons
-                url={previewUrl}
-                fileName={displayFileName}
+                docId={documentId}
                 downloadLabel="Download"
               />
               <button

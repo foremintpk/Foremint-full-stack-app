@@ -1,6 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { Database } from '@/types/database'
 import type { Coupon, CouponUsage, CouponDiscountType, CouponStatus } from '@/types/admin'
 
@@ -26,7 +26,7 @@ export interface CouponsDashboardData {
 }
 
 async function fetchCouponsQuery(
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: ReturnType<typeof createAdminClient>
 ): Promise<CouponsDashboardData> {
   const [couponsRes, usagesRes] = await Promise.all([
     supabase
@@ -72,7 +72,7 @@ async function fetchCouponsQuery(
     updatedAt: row.updated_at,
   }))
 
-  const usages: CouponUsage[] = (usagesRes.data ?? []).map((row: CouponUsageQueryRow) => ({
+  const usages: CouponUsage[] = (usagesRes.data ?? []).map((row: any) => ({
     id: row.id,
     couponId: row.coupon_id,
     couponName: row.coupons?.name || 'Coupon',
@@ -90,7 +90,7 @@ async function fetchCouponsQuery(
 }
 
 export async function getCouponsDashboardData(): Promise<CouponsDashboardData> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   return unstable_cache(
     async () => fetchCouponsQuery(supabase),
     ['admin-coupons-dashboard'],

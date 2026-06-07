@@ -59,7 +59,7 @@ async function revokeAllSessions(userId: string): Promise<void> {
 export async function updateAdminEmail(formData: FormData): Promise<UpdateEmailResult> {
   try {
     const admin = await getCurrentAdminProfile()
-    if (!admin || admin.role !== 'administrator') {
+    if (!admin || admin.isActive !== true || admin.role !== 'administrator') {
       return { error: 'Unauthorized: Only administrators can update settings.' }
     }
 
@@ -161,7 +161,7 @@ export async function updateAdminEmail(formData: FormData): Promise<UpdateEmailR
 export async function updateAdminPassword(formData: FormData): Promise<UpdatePasswordResult> {
   try {
     const admin = await getCurrentAdminProfile()
-    if (!admin || admin.role !== 'administrator') {
+    if (!admin || admin.isActive !== true || admin.role !== 'administrator') {
       return { error: 'Unauthorized: Only administrators can update settings.' }
     }
 
@@ -224,7 +224,7 @@ export async function updateAdminPassword(formData: FormData): Promise<UpdatePas
 export async function forceLogoutAllSessions(): Promise<{ error?: string }> {
   try {
     const admin = await getCurrentAdminProfile()
-    if (!admin || admin.role !== 'administrator') {
+    if (!admin || admin.isActive !== true || admin.role !== 'administrator') {
       return { error: 'Unauthorized: Only administrators can execute this action.' }
     }
 

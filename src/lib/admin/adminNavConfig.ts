@@ -58,6 +58,17 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'Users',
   },
   {
+    label: 'B2B Customers',
+    href: '/admin/b2b-customers',
+    icon: 'Briefcase',
+  },
+  {
+    label: 'Support Tickets',
+    href: '/admin/queries',
+    icon: 'LifeBuoy',
+    badgeKey: 'tickets',
+  },
+  {
     label: 'Blogs',
     href: '/admin/blogs',
     icon: 'BookOpen',

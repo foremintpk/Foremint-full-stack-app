@@ -12,6 +12,7 @@ export interface CustomerLlcItem {
   formationState: string | null;
   formationStateName: string | null;
   renewalDate: string | null;
+  formationDate: string | null;
   pendingAmount: number;
   paymentStatus: string;
   complianceState: 'compliant' | 'action_required' | 'renewal_due' | 'unknown';
@@ -41,7 +42,9 @@ export interface CustomerInvoiceItem {
   invoiceNumber: string;
   date: string;
   name: string;
-  amount: number;
+  amount: number;        // effective total billed (grandTotal + charges − discounts)
+  paidAmount: number;    // payments received so far
+  pendingAmount: number; // remaining balance
   status: 'paid' | 'unpaid' | 'partial';
   type: 'order' | 'manual';
   notes: string | null;

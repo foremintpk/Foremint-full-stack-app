@@ -1,11 +1,9 @@
 'use client'
 
 import { Eye, Download } from 'lucide-react'
-import { triggerDocumentDownload } from '@/lib/download-file'
 
 interface DocumentActionButtonsProps {
-  url: string
-  fileName: string
+  docId: string | null
   onPreview?: () => void
   previewLabel?: string
   downloadLabel?: string
@@ -13,14 +11,13 @@ interface DocumentActionButtonsProps {
 }
 
 export function DocumentActionButtons({
-  url,
-  fileName,
+  docId,
   onPreview,
   previewLabel = 'Preview',
   downloadLabel = 'Download',
   className = '',
 }: DocumentActionButtonsProps) {
-  if (!url) return null
+  if (!docId) return null
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
@@ -35,14 +32,15 @@ export function DocumentActionButtons({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={() => triggerDocumentDownload(url, fileName)}
+      <a
+        href={`/api/documents/${docId}/view?download=1`}
+        target="_blank"
+        rel="noopener noreferrer"
         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-[#ebebeb] hover:bg-gray-50 hover:text-black active:scale-95 transition-all rounded-[0.125rem]"
       >
         <Download className="w-3.5 h-3.5" />
         {downloadLabel}
-      </button>
+      </a>
     </div>
   )
 }

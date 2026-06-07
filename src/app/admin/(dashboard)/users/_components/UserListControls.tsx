@@ -95,6 +95,7 @@ export function UserListControls({ filters }: UserListControlsProps): React.JSX.
             <option value="administrator">Administrator</option>
             <option value="manager">Manager</option>
             <option value="customer">Customer</option>
+            <option value="b2b_customer">B2B Customer</option>
           </select>
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
             <svg className="h-3.5 w-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">

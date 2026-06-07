@@ -23,6 +23,7 @@ interface PostgrestOrderRow {
   status: string;
   payment_status: string;
   grand_total: number;
+  pending_amount_usd: number | null;
   formation_state_name: string | null;
   form_snapshot: unknown;
   created_at: string;
@@ -54,6 +55,7 @@ async function fetchLlcOrders(
         status,
         payment_status,
         grand_total,
+        pending_amount_usd,
         formation_state_name,
         form_snapshot,
         created_at,
@@ -135,7 +137,7 @@ async function fetchLlcOrders(
         llcName: formatLlcName(rawBusinessName),
         status: llcStatus,
         paymentStatus: row.payment_status as PaymentStatus,
-        pendingAmount: row.payment_status !== 'paid' ? grandTotal : 0,
+        pendingAmount: row.payment_status === 'paid' ? 0 : (row.pending_amount_usd ?? grandTotal),
         formationState: row.formation_state_name,
         createdAt: row.created_at,
         submittedAt: row.submitted_at,

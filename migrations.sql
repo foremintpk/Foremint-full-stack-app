@@ -522,5 +522,174 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_billing_entries_order_id ON public.billing_entries (order_id);
 CREATE INDEX IF NOT EXISTS idx_order_client_notifications_order_id ON public.order_client_notifications (order_id);
 
+-- Add missing formation details columns to companies table
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='filing_id') THEN
+    ALTER TABLE public.companies ADD COLUMN filing_id TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='formation_date') THEN
+    ALTER TABLE public.companies ADD COLUMN formation_date TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='state_renewal_date') THEN
+    ALTER TABLE public.companies ADD COLUMN state_renewal_date TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='state_renewal_fees') THEN
+    ALTER TABLE public.companies ADD COLUMN state_renewal_fees NUMERIC(10,2);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='companies' AND column_name='trading_address') THEN
+    ALTER TABLE public.companies ADD COLUMN trading_address JSONB;
+  END IF;
+END $$;
+
+-- Allow customers to read companies that are linked to their own orders
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='companies' AND policyname='Customers can read own companies') THEN
+    CREATE POLICY "Customers can read own companies"
+      ON public.companies FOR SELECT
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.orders o
+          WHERE o.company_id = id AND o.user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
+
+-- ─── Ticketing RLS: customers can create & reply to their own support tickets ──
+DROP POLICY IF EXISTS "Customers can manage own queries" ON public.queries;
+DROP POLICY IF EXISTS "Customers can create own queries" ON public.queries;
+DROP POLICY IF EXISTS "Customers can view own queries"   ON public.queries;
+DROP POLICY IF EXISTS "Customers can update own queries" ON public.queries;
+
+CREATE POLICY "Customers can create own queries"
+  ON public.queries FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Customers can view own queries"
+  ON public.queries FOR SELECT
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Customers can update own queries"
+  ON public.queries FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can insert messages for own queries" ON public.query_messages;
+DROP POLICY IF EXISTS "Customers can insert own query messages"    ON public.query_messages;
+
+CREATE POLICY "Customers can insert own query messages"
+  ON public.query_messages FOR INSERT
+  WITH CHECK (
+    sender_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.queries q
+      WHERE q.id = query_id AND q.user_id = auth.uid()
+    )
+  );
+
+-- ─── Customer READ access: notifications + ticket messages ────────────────────
+-- Without these SELECT policies the customer's RLS client returns ZERO rows,
+-- so notifications never appear and ticket messages are invisible.
+DROP POLICY IF EXISTS "Customers can read own notifications"   ON public.notifications;
+DROP POLICY IF EXISTS "Customers can update own notifications" ON public.notifications;
+
+CREATE POLICY "Customers can read own notifications"
+  ON public.notifications FOR SELECT
+  USING (
+    recipient_id = auth.uid()
+    OR (recipient_id IS NULL AND target_role = 'customer')
+  );
+
+CREATE POLICY "Customers can update own notifications"
+  ON public.notifications FOR UPDATE
+  USING (recipient_id = auth.uid())
+  WITH CHECK (recipient_id = auth.uid());
+
+DROP POLICY IF EXISTS "Users can view messages for own queries" ON public.query_messages;
+DROP POLICY IF EXISTS "Customers can view own query messages"   ON public.query_messages;
+
+CREATE POLICY "Customers can view own query messages"
+  ON public.query_messages FOR SELECT
+  USING (
+    is_internal = false
+    AND EXISTS (
+      SELECT 1 FROM public.queries q
+      WHERE q.id = query_id AND q.user_id = auth.uid()
+    )
+  );
+
 NOTIFY pgrst, 'reload schema';
+
+-- ─── Admin Support Queries & Messages Policies ──────────────────────────────
+
+-- Allow admins/managers to do select, insert, update, delete on queries
+DROP POLICY IF EXISTS "Admins and managers can view all queries" ON public.queries;
+CREATE POLICY "Admins and managers can view all queries"
+  ON public.queries FOR SELECT
+  USING (public.get_my_role() IN ('administrator', 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can update all queries" ON public.queries;
+CREATE POLICY "Admins and managers can update all queries"
+  ON public.queries FOR UPDATE
+  USING (public.get_my_role() IN ('administrator', 'manager'))
+  WITH CHECK (public.get_my_role() IN ('administrator', 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can insert queries" ON public.queries;
+CREATE POLICY "Admins and managers can insert queries"
+  ON public.queries FOR INSERT
+  WITH CHECK (public.get_my_role() IN ('administrator', 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can delete queries" ON public.queries;
+CREATE POLICY "Admins and managers can delete queries"
+  ON public.queries FOR DELETE
+  USING (public.get_my_role() IN ('administrator', 'manager'));
+
+-- Allow admins/managers to do select, insert, update, delete on query_messages
+DROP POLICY IF EXISTS "Admins and managers can view all query messages" ON public.query_messages;
+CREATE POLICY "Admins and managers can view all query messages"
+  ON public.query_messages FOR SELECT
+  USING (public.get_my_role() IN ('administrator', 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can insert query messages" ON public.query_messages;
+CREATE POLICY "Admins and managers can insert query messages"
+  ON public.query_messages FOR INSERT
+  WITH CHECK (
+    public.get_my_role() IN ('administrator', 'manager')
+    AND sender_id = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "Admins and managers can update query messages" ON public.query_messages;
+CREATE POLICY "Admins and managers can update query messages"
+  ON public.query_messages FOR UPDATE
+  USING (public.get_my_role() IN ('administrator', 'manager'))
+  WITH CHECK (public.get_my_role() IN ('administrator', 'manager'));
+
+DROP POLICY IF EXISTS "Admins and managers can delete query messages" ON public.query_messages;
+CREATE POLICY "Admins and managers can delete query messages"
+  ON public.query_messages FOR DELETE
+  USING (public.get_my_role() IN ('administrator', 'manager'));
+
+-- Add queries table to the supabase_realtime publication if not already present
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' 
+      AND schemaname = 'public' 
+      AND tablename = 'queries'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.queries;
+  END IF;
+END $$;
+
+NOTIFY pgrst, 'reload schema';
+
 

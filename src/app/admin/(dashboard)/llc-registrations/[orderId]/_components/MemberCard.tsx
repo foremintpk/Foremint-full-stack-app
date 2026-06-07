@@ -182,10 +182,9 @@ export function MemberCard({
  }}
  />
 
- {previewUrl && (
+ {documentId && (
  <DocumentActionButtons
- url={previewUrl}
- fileName={displayFileName}
+ docId={documentId}
  onPreview={() => setShowPreviewModal(true)}
  />
  )}
@@ -264,8 +263,7 @@ export function MemberCard({
  Interactive preview is only available for images.
  </p>
  <DocumentActionButtons
- url={previewUrl}
- fileName={displayFileName}
+ docId={documentId}
  downloadLabel="Download Document"
  />
  </div>
@@ -273,10 +271,9 @@ export function MemberCard({
  </div>
 
  <div className="flex items-center justify-end gap-2">
- {previewUrl && (
+ {documentId && (
  <DocumentActionButtons
- url={previewUrl}
- fileName={displayFileName}
+ docId={documentId}
  downloadLabel="Download"
  />
  )}

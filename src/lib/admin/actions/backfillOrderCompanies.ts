@@ -59,12 +59,12 @@ async function verifyAdministrator(): Promise<{ ok: true } | { ok: false; error:
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single();
 
   const role = profile?.role as AdminRole | undefined;
-  if (profileError || role !== 'administrator') {
+  if (profileError || !profile || profile.is_active !== true || role !== 'administrator') {
     return { ok: false, error: 'Only administrators can backfill order companies.' };
   }
 

@@ -24,11 +24,24 @@ export async function markAllNotificationsRead(
   }
 
   try {
-    // Use service-role client to bypass RLS — the session client may have no UPDATE policy
-    // if the migration hasn't been run yet. The RBAC check above ensures only admins call this.
     const supabase = await createClient();
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    const { data: claimsData, error: authErr } = await supabase.auth.getClaims();
+    const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
     if (authErr || !user) return { success: false, error: 'Unauthorized' };
+
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single();
+
+    if (profileErr || !profile || profile.is_active !== true ||
+        (profile.role !== 'administrator' && profile.role !== 'manager')) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const verifiedId = user.id;
+    const verifiedRole = profile.role as AdminRole;
 
     const admin = createAdminClient();
 
@@ -36,7 +49,7 @@ export async function markAllNotificationsRead(
     const { error: personalError } = await admin
       .from('notifications')
       .update({ is_read: true } as any)
-      .eq('recipient_id', adminId)
+      .eq('recipient_id', verifiedId)
       .eq('is_read', false);
 
     if (personalError) {
@@ -47,7 +60,7 @@ export async function markAllNotificationsRead(
     const { error: roleError } = await admin
       .from('notifications')
       .update({ is_read: true } as any)
-      .eq('target_role', adminRole)
+      .eq('target_role', verifiedRole)
       .eq('is_read', false);
 
     if (roleError) {
@@ -56,8 +69,8 @@ export async function markAllNotificationsRead(
     }
 
     // 3. Invalidate cached dynamic counts/lists
-    revalidateTag(`notif-count-${adminId}`, 'max');
-    revalidateTag(`notif-list-${adminId}`, 'max');
+    revalidateTag(`notif-count-${verifiedId}`, 'max');
+    revalidateTag(`notif-list-${verifiedId}`, 'max');
     revalidateTag('notif-count-admin', 'max');
     revalidateTag('notif-list-admin', 'max');
 

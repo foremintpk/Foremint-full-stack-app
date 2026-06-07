@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
+import { time } from "@/lib/perf";
 import type { Database } from "@/types/database";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
@@ -24,7 +25,6 @@ const AUTHENTICATED_ROUTES = [
 ];
 
 const SERVER_GUARDED_ROUTES = [
-  "/dashboard",
   "/login",
   "/register",
   "/forgot-password",
@@ -76,7 +76,7 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await time("proxy:auth.getUser()", () => supabase.auth.getUser());
 
   const authError = error as { code?: string; message?: string } | null;
   if (
@@ -105,11 +105,11 @@ export async function proxy(request: NextRequest) {
       return null;
     }
 
-    const { data: profile } = await (supabase
+    const { data: profile } = await time("proxy:role query", () => (supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
-      .maybeSingle() as unknown as Promise<{ data: { role: UserRole } | null }>);
+      .maybeSingle() as unknown as Promise<{ data: { role: UserRole } | null }>));
     return profile?.role || null;
   };
 

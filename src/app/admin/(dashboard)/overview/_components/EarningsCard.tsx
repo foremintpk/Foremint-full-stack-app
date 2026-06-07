@@ -1,82 +1,71 @@
-/**
- * @file src/app/admin/(dashboard)/overview/_components/EarningsCard.tsx
- * @description Beautiful full-width Total Earnings summary card mapping cash metrics to animated horizontal bars.
- * 
- * 1. Server vs Client choice rationale: Server Component wrapping Client animated progress bars.
- * 2. Caching layer: N/A.
- * 3. RBAC: N/A.
- * 4. Revalidation / Cache Busting: N/A.
- */
-
 import React from 'react';
 import { EarningsBreakdown } from '@/types/admin';
-import { formatPKR } from '@/lib/admin/formatters';
-import { STATUS_COLORS } from '@/lib/admin/statusColors';
-import { EarningsBar } from './EarningsBar';
+import { EarningsBarChart } from './EarningsBarChart';
 
 interface EarningsCardProps {
-    earnings: EarningsBreakdown;
+  earnings: EarningsBreakdown;
 }
 
+const formatUSD = (v: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
+
+const ROWS = [
+  { key: 'llcRevenue',         label: 'LLC Formations',      color: '#10b981', pctKey: 'llcPercent' },
+  { key: 'paypalRevenue',      label: 'PayPal Accounts',     color: '#3b82f6', pctKey: 'paypalPercent' },
+  { key: 'invoiceCommissions', label: 'Invoice Commissions', color: '#34088f', pctKey: 'invoicePercent' },
+] as const;
+
 export function EarningsCard({ earnings }: EarningsCardProps) {
-    const isZeroState = earnings.totalEarnings === 0;
+  const isZero = earnings.totalEarnings === 0;
 
-    return (
-        <article
-            aria-label="Revenue breakdown statistics"
-            className="bg-white border border-[#e0d9f7] rounded-2xl p-6 shadow-[0_1px_4px_rgba(52,8,143,0.06)] hover:shadow-[0_8px_24px_rgba(52,8,143,0.10)] transition-all duration-200 ease-in-out md:col-span-2"
-        >
-            {/* Top Total Revenue portion */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-100 pb-6">
-                <div>
-                    <span
-                        className="text-[12px] font-bold text-gray-500 uppercase tracking-wider font-inter"
-                    >
-                        Total Earnings
-                    </span>
-                    <h2
-                        className="text-[32px] font-bold text-black font-manrope leading-none mt-3"
-                        aria-label={`Total Earnings: $ ${(earnings.totalEarnings)}`}
-                    >
-                        {`$ ${earnings.totalEarnings}`}
-                    </h2>
-                    <p className="text-[11px] font-medium text-gray-400 font-inter mt-1.5 uppercase tracking-wider">
-                        All revenue combined
-                    </p>
-                </div>
+  return (
+    <article
+      aria-label="Revenue breakdown statistics"
+      className="bg-white border border-[#e0d9f7] rounded-2xl p-6 shadow-[0_1px_4px_rgba(52,8,143,0.06)] hover:shadow-[0_8px_24px_rgba(52,8,143,0.10)] transition-all duration-200 md:col-span-2 flex flex-col gap-6"
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider font-inter">Total Earnings</p>
+          <h2 className="text-[34px] font-bold text-gray-900 font-manrope leading-none mt-2">
+            {formatUSD(earnings.totalEarnings)}
+          </h2>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider font-inter mt-1">
+            All revenue combined
+          </p>
+        </div>
+        {isZero && (
+          <span className="self-start sm:self-auto text-xs font-bold text-[#f59e0b] bg-[#f59e0b]/10 px-3.5 py-1.5 rounded-full font-manrope uppercase tracking-wider animate-pulse">
+            No revenue in this period
+          </span>
+        )}
+      </div>
 
-                {isZeroState && (
-                    <div className="flex items-center">
-                        <span className="text-xs font-bold text-[#f59e0b] bg-[#f59e0b]/10 px-3.5 py-1.5 rounded-full font-manrope uppercase tracking-wider animate-pulse">
-                            No revenue recorded in this period
-                        </span>
-                    </div>
-                )}
+      {/* Bar chart */}
+      <EarningsBarChart earnings={earnings} />
+
+      {/* Summary rows */}
+      <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {ROWS.map((row) => (
+          <div
+            key={row.key}
+            className="flex flex-col gap-1 px-4 py-3 rounded-xl bg-[#f8f7ff] border border-[#e0d9f7]"
+          >
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: row.color }} />
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider font-inter">
+                {row.label}
+              </span>
             </div>
-
-            {/* Horizontal percentage metric bars grid */}
-            <div className="mt-6 space-y-5">
-                <EarningsBar
-                    label="LLC Formations"
-                    amount={earnings.llcRevenue}
-                    percent={earnings.llcPercent}
-                    colorClass={STATUS_COLORS.completed} // Emerald
-                />
-
-                <EarningsBar
-                    label="PayPal Accounts"
-                    amount={earnings.paypalRevenue}
-                    percent={earnings.paypalPercent}
-                    colorClass={STATUS_COLORS.processing} // Blue
-                />
-
-                <EarningsBar
-                    label="Invoice Commissions"
-                    amount={earnings.invoiceCommissions}
-                    percent={earnings.invoicePercent}
-                    colorClass="#34088f" // Foremint Deep Violet
-                />
-            </div>
-        </article>
-    );
+            <span className="text-lg font-bold text-gray-900 font-manrope">
+              {formatUSD((earnings as any)[row.key])}
+            </span>
+            <span className="text-[10px] text-gray-400 font-inter font-medium">
+              {(earnings as any)[row.pctKey]}% of total
+            </span>
+          </div>
+        ))}
+      </div>
+    </article>
+  );
 }

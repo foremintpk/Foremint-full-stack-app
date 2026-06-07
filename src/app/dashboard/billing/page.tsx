@@ -4,7 +4,7 @@
  */
 
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth/get-session';
+import { getSession, isB2BRole } from '@/lib/auth/get-session';
 import { getCachedDashboardData } from '@/lib/dashboard/getDashboardData';
 import BillingClient from './BillingClient';
 
@@ -18,9 +18,15 @@ export default async function BillingPage() {
     redirect('/login');
   }
 
+  // Billing is not available to B2B (read-only) customers.
+  if (isB2BRole(session.profile.role)) {
+    redirect('/dashboard');
+  }
+
   const data = await getCachedDashboardData(
     session.user.id,
-    session.profile.full_name || ''
+    session.profile.full_name || '',
+    session.profile
   );
 
   return (

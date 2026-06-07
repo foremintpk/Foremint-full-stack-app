@@ -1,14 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import Link from 'next/link';
 import type { CustomerInvoiceItem, CustomerLlcItem } from '@/types/dashboard';
-import { submitBankTransferReceipt, simulateStripePayment } from '@/lib/dashboard/actions';
 import {
-  CreditCard, DollarSign, FileText, Download, Upload,
-  Check, Loader2, ExternalLink, Search, Filter,
-  Building2, ChevronDown, AlertCircle
+  DollarSign, FileText, Check, ExternalLink, Search,
+  AlertCircle, ArrowRight,
 } from 'lucide-react';
 
 function PaymentBadge({ status }: { status: string }) {
@@ -41,84 +38,40 @@ interface Props {
   userId: string;
 }
 
-export default function BillingClient({ invoices, llcs, userId }: Props) {
+export default function BillingClient({ invoices }: Props) {
   const [filter, setFilter] = useState<'all' | 'paid' | 'unpaid' | 'partial'>('all');
   const [search, setSearch] = useState('');
-  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
-  const [uploadingOrderId, setUploadingOrderId] = useState<string | null>(null);
-  const [result, setResult] = useState<{ type: 'success' | 'error'; msg: string; id: string } | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
-  // Stats
-  const totalPaid = invoices.filter(i => i.status === 'paid' && i.type === 'order').reduce((s, i) => s + i.amount, 0);
-  const totalUnpaid = invoices.filter(i => i.status !== 'paid' && i.type === 'order').reduce((s, i) => s + i.amount, 0);
+  // Stats — derived from the canonical paid/pending amounts (in sync with admin)
+  const totalPaid = invoices.filter(i => i.type === 'order').reduce((s, i) => s + i.paidAmount, 0);
+  const totalUnpaid = invoices.filter(i => i.type === 'order').reduce((s, i) => s + i.pendingAmount, 0);
   const totalInvoices = invoices.length;
   const unpaidCount = invoices.filter(i => i.status !== 'paid').length;
 
-  // Filtered list
   const filtered = invoices.filter((inv) => {
     if (filter !== 'all' && inv.status !== filter) return false;
     if (search) {
       const q = search.toLowerCase();
-      return (
-        inv.name.toLowerCase().includes(q) ||
-        inv.invoiceNumber.toLowerCase().includes(q)
-      );
+      return inv.name.toLowerCase().includes(q) || inv.invoiceNumber.toLowerCase().includes(q);
     }
     return true;
   });
-
-  const handleReceiptUpload = async (orderId: string, file: File) => {
-    setUploadingOrderId(orderId);
-    setResult(null);
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-      const uploadRes = await fetch('/api/onboarding/upload-receipt', { method: 'POST', body: fd });
-      if (!uploadRes.ok) throw new Error('Upload failed');
-      const { url } = await uploadRes.json();
-      const res = await submitBankTransferReceipt(orderId, url, file.name, file.size);
-      if (!res.success) throw new Error(res.error);
-      setResult({ type: 'success', msg: 'Receipt uploaded successfully!', id: orderId });
-      router.refresh();
-    } catch (err: any) {
-      setResult({ type: 'error', msg: err.message || 'Upload failed', id: orderId });
-    } finally {
-      setUploadingOrderId(null);
-    }
-  };
-
-  const handleCardPayment = (orderId: string) => {
-    setPayingOrderId(orderId);
-    startTransition(async () => {
-      setResult(null);
-      const res = await simulateStripePayment(orderId);
-      if (res.success) {
-        setResult({ type: 'success', msg: 'Payment confirmed!', id: orderId });
-        router.refresh();
-      } else {
-        setResult({ type: 'error', msg: res.error || 'Payment failed', id: orderId });
-      }
-      setPayingOrderId(null);
-    });
-  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-black text-gray-900 font-manrope">Billing</h1>
-        <p className="text-sm text-gray-500 mt-1 font-inter">View invoices, upload payment proofs, and manage payments.</p>
+        <p className="text-sm text-gray-500 mt-1 font-inter">View invoices and complete payments for your orders.</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Invoices', value: totalInvoices, icon: FileText,   color: 'text-[#34088f]', bg: 'bg-[#34088f]/5' },
-          { label: 'Unpaid',         value: unpaidCount,   icon: AlertCircle,color: 'text-rose-600',  bg: 'bg-rose-50' },
-          { label: 'Total Paid',     value: `$${totalPaid.toLocaleString()}`,  icon: Check,   color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Outstanding',    value: `$${totalUnpaid.toLocaleString()}`,icon: DollarSign, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Total Invoices', value: totalInvoices, icon: FileText,    color: 'text-[#34088f]',   bg: 'bg-[#34088f]/5' },
+          { label: 'Unpaid',         value: unpaidCount,   icon: AlertCircle, color: 'text-rose-600',    bg: 'bg-rose-50' },
+          { label: 'Total Paid',     value: `$${totalPaid.toLocaleString()}`,    icon: Check,      color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Outstanding',    value: `$${totalUnpaid.toLocaleString()}`,  icon: DollarSign, color: 'text-amber-600',   bg: 'bg-amber-50' },
         ].map((stat) => {
           const Icon = stat.icon;
           return (
@@ -133,7 +86,7 @@ export default function BillingClient({ invoices, llcs, userId }: Props) {
         })}
       </div>
 
-      {/* Filters */}
+      {/* Filters + list */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -152,9 +105,7 @@ export default function BillingClient({ invoices, llcs, userId }: Props) {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider font-manrope transition-colors ${
-                  filter === f
-                    ? 'bg-[#34088f] text-white'
-                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  filter === f ? 'bg-[#34088f] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                 }`}
               >
                 {f}
@@ -163,7 +114,6 @@ export default function BillingClient({ invoices, llcs, userId }: Props) {
           </div>
         </div>
 
-        {/* Invoice list */}
         {filtered.length === 0 ? (
           <div className="p-16 text-center">
             <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -183,57 +133,42 @@ export default function BillingClient({ invoices, llcs, userId }: Props) {
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <span className="text-xs text-gray-400 font-mono font-inter">{inv.invoiceNumber}</span>
                         <TypeBadge type={inv.type} />
-                        <span className="text-xs text-gray-400 font-inter">
-                          {new Date(inv.date).toLocaleDateString()}
-                        </span>
+                        <span className="text-xs text-gray-400 font-inter">{new Date(inv.date).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3 ml-13 sm:ml-0">
                     <div className="text-right mr-2">
-                      <p className="text-sm font-black text-gray-900 font-manrope">${inv.amount.toLocaleString()}</p>
+                      {/* Show what's actually owed (pending) for unpaid/partial; full amount when paid */}
+                      <p className="text-sm font-black text-gray-900 font-manrope">
+                        ${(inv.status === 'paid' ? inv.amount : inv.pendingAmount).toLocaleString()}
+                      </p>
+                      {inv.status === 'partial' && inv.paidAmount > 0 && (
+                        <p className="text-[10px] text-gray-400 font-inter">
+                          ${inv.paidAmount.toLocaleString()} paid of ${inv.amount.toLocaleString()}
+                        </p>
+                      )}
                       <PaymentBadge status={inv.status} />
                     </div>
 
+                    {/* Pay Now → redirects to the order's billing tab (canonical payment flow) */}
                     {inv.type === 'order' && inv.status !== 'paid' && (
-                      <div className="flex items-center gap-2">
-                        <label className="cursor-pointer">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-bold transition-colors ${
-                            uploadingOrderId === inv.id
-                              ? 'bg-gray-200 text-gray-500'
-                              : 'bg-white border border-gray-200 text-gray-600 hover:border-[#34088f] hover:text-[#34088f]'
-                          }`}>
-                            {uploadingOrderId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-                            Receipt
-                          </span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*,.pdf"
-                            disabled={uploadingOrderId !== null}
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleReceiptUpload(inv.id, file);
-                            }}
-                          />
-                        </label>
-                        <button
-                          onClick={() => handleCardPayment(inv.id)}
-                          disabled={isPending || payingOrderId !== null}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#34088f] text-white text-[10px] font-bold hover:bg-[#2a0673] transition-colors disabled:opacity-50"
-                        >
-                          {payingOrderId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
-                          Pay
-                        </button>
-                      </div>
+                      <Link
+                        href={`/dashboard/llc/${inv.id}?tab=billing` as any}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#34088f] text-white text-xs font-bold hover:bg-[#2a0673] transition-colors font-manrope whitespace-nowrap"
+                      >
+                        Pay Now <ArrowRight className="w-3.5 h-3.5" />
+                      </Link>
                     )}
 
+                    {/* Receipt — proxied API link, never the raw Cloudinary URL */}
                     {inv.downloadUrl && (
                       <a
                         href={inv.downloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
+                        title="View receipt"
                         className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -241,16 +176,6 @@ export default function BillingClient({ invoices, llcs, userId }: Props) {
                     )}
                   </div>
                 </div>
-
-                {result?.id === inv.id && (
-                  <div className={`mt-3 p-2.5 rounded-lg text-xs font-inter ${
-                    result.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-red-50 text-red-600 border border-red-200'
-                  }`}>
-                    {result.msg}
-                  </div>
-                )}
               </div>
             ))}
           </div>

@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
 
     // Check if user is authenticated using the server-side client
     const supabaseServer = await createServerClient();
-    const { data: { user } } = await supabaseServer.auth.getUser();
+    const { data: claimsData } = await supabaseServer.auth.getClaims();
+    const user = claimsData?.claims;
 
     const upsertPayload: any = {
       temp_session_key,
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     // If authenticated, preserve/assign their user_id
     if (user) {
-      upsertPayload.user_id = user.id;
+      upsertPayload.user_id = user.sub;
     }
 
     const { data, error } = await supabaseAdmin

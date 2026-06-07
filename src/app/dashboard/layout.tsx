@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth/get-session';
-import { getDashboardData } from '@/lib/dashboard/getDashboardData';
+import { getSession, isB2BRole, AccountDisabledError } from '@/lib/auth/get-session';
+import { createClient } from '@/lib/supabase/server';
+import { getCachedDashboardData, getCachedB2BDashboardData } from '@/lib/dashboard/getDashboardData';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 
 export const revalidate = 60; // Hold layout renders in Full Route Cache for max 60s
@@ -13,13 +14,26 @@ export default async function CustomerDashboardLayout({
   let session;
   try {
     session = await getSession();
-  } catch {
+  } catch (err) {
+    if (err instanceof AccountDisabledError) {
+      const supabase = await createClient();
+      await supabase.auth.signOut();
+      redirect('/login?reason=account-disabled');
+    }
     redirect('/login');
   }
 
+  const isB2B = isB2BRole(session.profile.role);
+
   // Retrieve initial dashboard states for badges & notifications (hits Layer 1 cache)
   const name = session.profile.full_name || '';
-  const data = await getDashboardData(session.user.id, name);
+  // Same React cache()-wrapped functions page.tsx uses — sharing the wrapper
+  // (not the raw function) lets request-scoped memoization dedupe the underlying
+  // fetchDashboardDataQuery call between layout and page (mirrors the O4 fix
+  // where the admin layout switched to share getUnreadOrderCount's memoization).
+  const data = isB2B
+    ? await getCachedB2BDashboardData(session.user.id, name, session.profile)
+    : await getCachedDashboardData(session.user.id, name, session.profile);
 
   const notificationsCount = data.notifications.filter(n => !n.isRead).length;
   const actionsCount = data.actions.length;
@@ -32,6 +46,7 @@ export default async function CustomerDashboardLayout({
       profile={data.profile}
       initialNotifications={data.notifications}
       initialLlcNames={initialLlcNames}
+      isB2B={isB2B}
       badgeCounts={{
         notifications: notificationsCount,
         actions: actionsCount,

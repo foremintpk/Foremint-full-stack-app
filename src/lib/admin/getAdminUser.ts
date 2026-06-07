@@ -21,7 +21,11 @@ export const getAdminUser = cache(async (): Promise<AdminProfile | null> => {
   if (profile.role !== 'administrator' && profile.role !== 'manager') {
     return null;
   }
-  
+
+  if (profile.is_active !== true) {
+    return null;
+  }
+
   return {
     id: profile.id,
     email: profile.email,

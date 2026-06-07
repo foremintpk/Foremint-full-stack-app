@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 import { OrderCreatedEmailHtml } from './templates/order-created'
 import { AdminOrderNotificationHtml } from './templates/admin-order-notification'
+import { AdminReceiptUploadedHtml } from './templates/admin-receipt-uploaded'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -180,4 +181,60 @@ export async function sendAdminOrderNotificationEmail(
   }
 
   console.log(`[Email] ✓ Admin notification sent → ${adminEmail} (order: ${orderId})`)
+}
+
+// ─── Admin Receipt-Uploaded Notification ──────────────────────────────────────
+
+export interface AdminReceiptUploadedParams {
+  customerName: string
+  customerEmail: string
+  businessName: string
+  orderId: string
+  orderNumber: string
+  formationState?: string
+  pendingAmount?: number
+}
+
+/**
+ * Emails the admin when a customer uploads a bank transfer receipt.
+ * Safe to call fire-and-forget with .catch().
+ */
+export async function sendAdminReceiptUploadedEmail(
+  params: AdminReceiptUploadedParams
+): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('[Email] RESEND_API_KEY not set — skipping receipt-uploaded email')
+    return
+  }
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.warn('[Email] ADMIN_EMAIL not configured — skipping receipt-uploaded email')
+    return
+  }
+
+  const { customerName, customerEmail, businessName, orderId, orderNumber, formationState, pendingAmount } = params
+  const adminDashboardUrl = `${getAppUrl()}/admin/llc-registrations/${orderId}`
+
+  const { error } = await resend.emails.send({
+    from: FROM_ADDRESS,
+    to: adminEmail,
+    subject: `🧾 Payment Receipt Uploaded — ${businessName} (${customerName})`,
+    html: AdminReceiptUploadedHtml({
+      customerName,
+      customerEmail,
+      businessName,
+      orderNumber,
+      formationState,
+      pendingAmount,
+      uploadedAt: formatDate(),
+      adminDashboardUrl,
+    }),
+  })
+
+  if (error) {
+    console.error('[Email] Receipt-uploaded send failed:', error)
+    throw new Error(`[Email] Receipt-uploaded failed: ${error.message}`)
+  }
+
+  console.log(`[Email] ✓ Receipt-uploaded notice sent → ${adminEmail} (order: ${orderId})`)
 }

@@ -63,7 +63,7 @@ function onboardingReducer(state: OnboardingState, action: OnboardingAction): On
           if (i === 5) {
             newFormData[5] = {
               ...rawData[5],
-              selectedAddons: Array.isArray(rawData[5].selectedAddons) ? rawData[5].selectedAddons.map(String) : [],
+              selectedAddons: Array.isArray(rawData[5].selectedAddons) ? rawData[5].selectedAddons : [],
             };
           }
         } else if (i === 5) {
@@ -305,12 +305,6 @@ export function useOnboarding() {
   }, [dispatch]);
 
   const goToNextStep = useCallback(async () => {
-    if (state.returnToReview) {
-      dispatch({ type: 'SET_RETURN_TO_REVIEW', value: false });
-      navigateToStep(6);
-      return;
-    }
-
     if (currentStep === 5) {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
@@ -318,6 +312,12 @@ export function useOnboarding() {
 
       if (!user) {
         setShowAccountPopup(true);
+        return;
+      }
+
+      if (state.returnToReview) {
+        dispatch({ type: 'SET_RETURN_TO_REVIEW', value: false });
+        navigateToStep(6);
         return;
       }
 
@@ -334,6 +334,12 @@ export function useOnboarding() {
       }
 
       dispatch({ type: 'COMPLETE_STEP', step: 5 });
+      navigateToStep(6);
+      return;
+    }
+
+    if (state.returnToReview) {
+      dispatch({ type: 'SET_RETURN_TO_REVIEW', value: false });
       navigateToStep(6);
       return;
     }
@@ -367,6 +373,7 @@ export function useOnboarding() {
     currentStep,
     isPending,
     orderSubmitStatus: state.orderSubmitStatus,
+    setShowAccountPopup,
     saveStepData,
     goToNextStep,
     goToPrevStep,

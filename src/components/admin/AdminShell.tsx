@@ -10,12 +10,14 @@
 
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { LlcNameProvider } from '@/context/llc-name-context';
 import { AdminBadgeContext } from '@/context/admin-badge-context';
+import { createClient } from '@/lib/supabase/client';
+import { getAdminBadgeCounts } from '@/lib/admin/actions/getAdminBadgeCounts';
 
 interface AdminShellProps {
   adminProfile: AdminProfile;
@@ -34,6 +36,8 @@ export function AdminShell({
 }: AdminShellProps) {
   // Synchronized client-side state for badges (real-time decrease/increase)
   const [liveBadges, setLiveBadges] = useState<BadgeCounts>(badgeCounts);
+  const supabase = useMemo(() => createClient(), []);
+  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleNotificationBadgeChange = useCallback((unreadNotifCount: number) => {
     setLiveBadges((prev) => {
@@ -48,6 +52,33 @@ export function AdminShell({
       llcRegistrations: Math.max(0, prev.llcRegistrations - 1),
     }));
   }, []);
+
+  // ── Realtime sidebar badges ──────────────────────────────────────────────
+  // Admins can SELECT all rows, so postgres_changes delivers reliably here.
+  // Any insert/update on the watched tables triggers a debounced count refetch.
+  useEffect(() => {
+    const scheduleRefetch = () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+      refetchTimer.current = setTimeout(async () => {
+        const fresh = await getAdminBadgeCounts();
+        setLiveBadges(fresh);
+      }, 400);
+    };
+
+    const channel = supabase
+      .channel('admin-badges')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queries' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'billing_entries' }, scheduleRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_order_views' }, scheduleRefetch)
+      .subscribe();
+
+    return () => {
+      if (refetchTimer.current) clearTimeout(refetchTimer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [supabase]);
 
   return (
     <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>

@@ -9,7 +9,8 @@ import { revalidatePath } from 'next/cache';
 // ─── Step 1 ────────────────────────────────────────────────────────────────
 export async function saveStep1(data: Step1Data) {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: claimsData, error: authError } = await supabase.auth.getClaims();
+  const user = claimsData?.claims;
 
   if (authError || !user) redirect('/onboarding');
 
@@ -20,12 +21,12 @@ export async function saveStep1(data: Step1Data) {
 
   const { error } = await ((supabase
     .from('profiles') as any)
-    .update({ 
-      ...parsed.data, 
-      onboarding_step: 1, 
-      updated_at: new Date().toISOString() 
+    .update({
+      ...parsed.data,
+      onboarding_step: 1,
+      updated_at: new Date().toISOString()
     })
-    .eq('id', user.id));
+    .eq('id', user.sub));
 
   if (error) return { error: { _server: [error.message] } };
   
@@ -36,7 +37,8 @@ export async function saveStep1(data: Step1Data) {
 // ─── Step 2 ────────────────────────────────────────────────────────────────
 export async function saveStep2(data: Step2Data) {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: claimsData, error: authError } = await supabase.auth.getClaims();
+  const user = claimsData?.claims;
 
   if (authError || !user) redirect('/onboarding');
 
@@ -47,12 +49,12 @@ export async function saveStep2(data: Step2Data) {
 
   const { error } = await ((supabase
     .from('profiles') as any)
-    .update({ 
-      ...parsed.data, 
-      onboarding_step: 2, 
-      updated_at: new Date().toISOString() 
+    .update({
+      ...parsed.data,
+      onboarding_step: 2,
+      updated_at: new Date().toISOString()
     })
-    .eq('id', user.id));
+    .eq('id', user.sub));
 
   if (error) return { error: { _server: [error.message] } };
   
@@ -63,7 +65,8 @@ export async function saveStep2(data: Step2Data) {
 // ─── Step 3 ────────────────────────────────────────────────────────────────
 export async function saveStep3(data: Step3Data) {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const { data: claimsData, error: authError } = await supabase.auth.getClaims();
+  const user = claimsData?.claims;
 
   if (authError || !user) redirect('/onboarding');
 
@@ -75,12 +78,12 @@ export async function saveStep3(data: Step3Data) {
   // Step 3 does NOT set onboarding_completed — that happens in 3B after file upload
   const { error } = await ((supabase
     .from('profiles') as any)
-    .update({ 
-      ...parsed.data, 
-      onboarding_step: 3, 
-      updated_at: new Date().toISOString() 
+    .update({
+      ...parsed.data,
+      onboarding_step: 3,
+      updated_at: new Date().toISOString()
     })
-    .eq('id', user.id));
+    .eq('id', user.sub));
 
   if (error) return { error: { _server: [error.message] } };
   

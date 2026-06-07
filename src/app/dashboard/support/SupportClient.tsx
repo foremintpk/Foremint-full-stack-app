@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useTransition, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import { createSupportQuery, sendSupportMessage } from '@/lib/dashboard/actions';
 import {
   MessageSquare, Plus, Send, Loader2, Clock, CheckCircle2,
@@ -241,21 +242,62 @@ function ConversationThread({ query, userId }: { query: SupportQuery; userId: st
   const [newMsg, setNewMsg] = useState('');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>(query.messages || []);
+  const [liveStatus, setLiveStatus] = useState(query.status);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null);
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
+
+  // Re-seed when switching tickets or after a server refresh
+  useEffect(() => { setMessages(query.messages || []); }, [query.id, query.messages]);
+  useEffect(() => { setLiveStatus(query.status); }, [query.id, query.status]);
+
+  // Live updates via Broadcast — RLS-independent, guaranteed bidirectional delivery.
+  // Both customer and admin join `ticket-${id}` and broadcast after a successful DB write.
+  useEffect(() => {
+    const channel = supabase.channel(`ticket-${query.id}`, {
+      config: { broadcast: { self: false } },
+    });
+    channel
+      .on('broadcast', { event: 'message' }, ({ payload }) => {
+        if (payload?.isInternal) return; // never surface internal admin notes
+        setMessages(prev => prev.some(m => m.id === payload.id) ? prev : [...prev, {
+          id: payload.id, query_id: query.id, sender_id: payload.senderId,
+          content: payload.content, is_internal: false, created_at: payload.createdAt,
+        }]);
+      })
+      .on('broadcast', { event: 'status' }, ({ payload }) => {
+        if (payload?.status) setLiveStatus(payload.status);
+      })
+      .subscribe();
+    channelRef.current = channel;
+    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+  }, [query.id, supabase]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [query.messages.length]);
+  }, [messages.length]);
 
   const handleSend = () => {
     if (!newMsg.trim()) return;
+    const content = newMsg.trim();
     startTransition(async () => {
       setError(null);
-      const res = await sendSupportMessage(query.id, newMsg);
+      const res = await sendSupportMessage(query.id, content);
       if (res.success) {
+        const tempId = `c-${Date.now()}`;
+        setMessages(prev => [...prev, {
+          id: tempId, query_id: query.id, sender_id: userId,
+          content, is_internal: false, created_at: new Date().toISOString(),
+        }]);
+        // Broadcast to the admin side
+        channelRef.current?.send({
+          type: 'broadcast', event: 'message',
+          payload: { id: tempId, senderId: userId, content, isInternal: false, createdAt: new Date().toISOString() },
+        });
         setNewMsg('');
         router.refresh();
       } else {
@@ -270,16 +312,16 @@ function ConversationThread({ query, userId }: { query: SupportQuery; userId: st
       <div className="px-6 py-4 border-b border-gray-100">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-black text-gray-900 font-manrope truncate">{query.subject}</h3>
-          <StatusBadge status={query.status} />
+          <StatusBadge status={liveStatus} />
         </div>
         <p className="text-[10px] text-gray-400 font-inter mt-1">
-          Created {new Date(query.createdAt).toLocaleDateString()} • {query.messageCount} messages
+          Created {new Date(query.createdAt).toLocaleDateString()} • {messages.length} messages
         </p>
       </div>
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[400px]">
-        {query.messages.map((msg: any) => {
+        {messages.map((msg: any) => {
           const isMine = msg.sender_id === userId;
           return (
             <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
@@ -307,7 +349,7 @@ function ConversationThread({ query, userId }: { query: SupportQuery; userId: st
         </div>
       )}
 
-      {query.status !== 'closed' && (
+      {liveStatus !== 'closed' && (
         <div className="px-6 py-4 border-t border-gray-100">
           <div className="flex items-end gap-3">
             <textarea

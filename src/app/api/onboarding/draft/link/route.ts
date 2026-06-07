@@ -6,7 +6,8 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const { data: claimsData, error: authError } = await supabase.auth.getClaims()
+  const user = claimsData?.claims
 
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await linkDraftToUser(temp_session_key, user.id)
+    await linkDraftToUser(temp_session_key, user.sub)
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('link draft error:', err)

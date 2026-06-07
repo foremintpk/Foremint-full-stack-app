@@ -17,6 +17,7 @@
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { time } from '@/lib/perf';
 import { AdminRole, SafeAdminNotification } from '@/types/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
@@ -26,13 +27,13 @@ async function fetchUnreadNotifications(
   adminId: string,
   adminRole: AdminRole
 ): Promise<SafeAdminNotification[]> {
-  const { data, error } = await supabase
+  const { data, error } = await time('getUnreadNotifications:query', () => supabase
     .from('notifications')
     .select('id, title, body, type, link, is_read, created_at')
     .or(`recipient_id.eq.${adminId},target_role.eq.${adminRole}`)
     .eq('is_read', false)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(20));
 
   if (error) {
     console.error('Error fetching unread notifications:', error);

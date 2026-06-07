@@ -19,10 +19,10 @@ export async function deleteDocument(
   try {
     const supabase = await createClient();
 
-    // FIX 1: Retrieve user role via RPC call to prevent infinite RLS recursion
+    // Only administrators may delete documents
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
-      return { success: false, error: 'Unauthorized: Admin role required' };
+    if (roleError || role !== 'administrator') {
+      return { success: false, error: 'Unauthorized: Administrator role required' };
     }
 
     // 1. Fetch document row to inspect metadata and file parameters

@@ -64,9 +64,14 @@ export async function validateCoupon(
     .from('coupons')
     .select('*')
     .eq('code', normalized)
+    .eq('status', 'active')
     .maybeSingle()
 
-  if (error || !coupon) {
+  if (error) {
+    console.error('[validateCoupon] query error:', error)
+    return { error: 'Unable to validate coupon. Please try again.' }
+  }
+  if (!coupon) {
     return { error: 'Coupon not found.' }
   }
 

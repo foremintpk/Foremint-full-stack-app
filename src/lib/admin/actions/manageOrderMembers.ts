@@ -6,13 +6,13 @@ import { revalidateOrder } from './revalidateOrder';
 export interface MemberInput {
   fullName: string;
   address: string;
-  ssn?: string;
+  ssnItin?: string;
 }
 
 export async function addOrderMember(
   orderId: string,
   member: MemberInput
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; memberIndex?: number; error?: string }> {
   try {
     const supabase = await createClient();
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
@@ -35,13 +35,13 @@ export async function addOrderMember(
     const newMember = {
       fullName: member.fullName,
       address: member.address,
-      ssn: member.ssn ?? '',
+      ssnItin: member.ssnItin ?? '',
       position: 'Member',
       slotKey: `member_${existingMembers.length}_passport`,
     };
 
     // Update the members array in form_snapshot
-    const updatedSnapshot = {
+    const updatedSnapshot: Record<string, any> = {
       ...snapshot,
       members: [...existingMembers, newMember],
     };
@@ -52,7 +52,61 @@ export async function addOrderMember(
         ...(snapshot.step4 as Record<string, any>),
         members: [...existingMembers, newMember],
       };
-      delete updatedSnapshot.members;
+      updatedSnapshot.members = undefined;
+    }
+
+    const { error: updateErr } = await (supabase as any)
+      .from('orders')
+      .update({ form_snapshot: updatedSnapshot, updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+
+    if (updateErr) return { success: false, error: updateErr.message };
+
+    await revalidateOrder(orderId);
+    return { success: true, memberIndex: existingMembers.length };
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? 'Unexpected error' };
+  }
+}
+
+export async function updateOrderMemberAt(
+  orderId: string,
+  memberIndex: number,
+  updates: { fullName: string; address: string; ssnItin: string }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: role, error: roleError } = await supabase.rpc('get_my_role');
+    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    const { data: order, error: orderErr } = await (supabase as any)
+      .from('orders')
+      .select('form_snapshot')
+      .eq('id', orderId)
+      .single();
+
+    if (orderErr || !order) return { success: false, error: 'Order not found' };
+
+    const snapshot = (order.form_snapshot as Record<string, any>) || {};
+    const existingMembers: any[] = snapshot?.step4?.members ?? snapshot?.members ?? [];
+
+    if (memberIndex < 0 || memberIndex >= existingMembers.length) {
+      return { success: false, error: 'Member not found' };
+    }
+
+    const updatedMembers = existingMembers.map((m: any, i: number) =>
+      i === memberIndex
+        ? { ...m, fullName: updates.fullName, address: updates.address, addressLine1: updates.address, ssnItin: updates.ssnItin }
+        : m
+    );
+
+    const updatedSnapshot = { ...snapshot };
+    if (snapshot.step4) {
+      updatedSnapshot.step4 = { ...snapshot.step4, members: updatedMembers };
+    } else {
+      updatedSnapshot.members = updatedMembers;
     }
 
     const { error: updateErr } = await (supabase as any)

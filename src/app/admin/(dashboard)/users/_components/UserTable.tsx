@@ -16,7 +16,8 @@ interface UserTableProps {
 export async function UserTable({ users }: UserTableProps): Promise<React.JSX.Element | null> {
   // Fetch current admin information on the server
   const supabase = await createClient();
-  const { data: { user: sessionUser } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const sessionUser = claimsData?.claims;
 
   if (!sessionUser) {
     return null;
@@ -25,11 +26,11 @@ export async function UserTable({ users }: UserTableProps): Promise<React.JSX.El
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', sessionUser.id)
+    .eq('id', sessionUser.sub)
     .single();
 
   const currentAdminRole = (profile?.role || 'customer') as UserRole;
-  const currentAdminId = sessionUser.id;
+  const currentAdminId = sessionUser.sub;
 
   return (
     <div className="w-full">
@@ -46,9 +47,9 @@ export async function UserTable({ users }: UserTableProps): Promise<React.JSX.El
       </div>
 
       {/* Desktop Grid Table View */}
-      <div className="hidden md:block w-full border border-[#e0d9f7] rounded-2xl overflow-hidden bg-white shadow-[0_1px_4px_rgba(52,8,143,0.06)] font-inter">
+      <div className="hidden md:block w-full border border-[#e0d9f7] rounded-2xl bg-white shadow-[0_1px_4px_rgba(52,8,143,0.06)] font-inter">
         {/* Table Header */}
-        <div className="grid grid-cols-[1.5fr_1fr_1fr_0.8fr_1fr_0.8fr] gap-0 px-6 py-3.5 bg-[#f4f0fe] border-b border-[#e0d9f7] text-xs font-semibold text-[#34088f] uppercase tracking-wider select-none font-manrope">
+        <div className="grid grid-cols-[1.5fr_1fr_1fr_0.8fr_1fr_0.8fr] gap-0 px-6 py-3.5 bg-[#f4f0fe] border-b border-[#e0d9f7] rounded-t-2xl text-xs font-semibold text-[#34088f] uppercase tracking-wider select-none font-manrope">
           <div>Name / Email</div>
           <div>Phone</div>
           <div>Role</div>
@@ -58,7 +59,7 @@ export async function UserTable({ users }: UserTableProps): Promise<React.JSX.El
         </div>
 
         {/* Rows */}
-        <div className="divide-y divide-[#e0d9f7]">
+        <div className="divide-y divide-[#e0d9f7] [&>*:last-child]:rounded-b-2xl">
           {users.map((user) => (
             <UserRow
               key={user.id}

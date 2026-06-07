@@ -43,6 +43,7 @@ export interface NavItem {
 export interface BadgeCounts {
   llcRegistrations: number
   notifications: number
+  tickets: number
 }
 
 export interface AdminNotification {
@@ -64,7 +65,7 @@ export interface NotificationApiResponse {
 }
 
 export type CouponDiscountType = 'percentage' | 'amount'
-export type CouponStatus = 'active' | 'inactive'
+export type CouponStatus = 'active' | 'inactive' | 'deleted'
 
 export interface Coupon {
   id: string
@@ -127,19 +128,27 @@ export interface PaypalStats {
 }
 
 export interface EarningsBreakdown {
-  llcRevenue: number       // PKR
-  paypalRevenue: number    // PKR
-  invoiceCommissions: number  // PKR — pulled from invoices table (future: 0 for now)
-  totalEarnings: number    // sum of above
+  llcRevenue: number
+  paypalRevenue: number
+  invoiceCommissions: number
+  totalEarnings: number
   llcPercent: number       // 0–100
   paypalPercent: number
   invoicePercent: number
+}
+
+export interface DailyTrendPoint {
+  date: string             // YYYY-MM-DD
+  llcOrders: number
+  paypalOrders: number
+  totalRevenue: number
 }
 
 export interface OverviewStats {
   llc: LlcStats
   paypal: PaypalStats
   earnings: EarningsBreakdown
+  dailyTrend: DailyTrendPoint[]
   rangeKey: DateRangeFilter
   fetchedAt: string        // ISO string — for display "Last updated X ago"
 }
@@ -204,7 +213,9 @@ export interface OrderMember {
   city: string
   state: string
   country: string
-  idDocUrl: string | null
+  ssnItin: string | null
+  idDocId: string | null        // document.id for the member's identity document
+  idDocUrl: string | null       // kept for legacy reference; prefer routing through idDocId
   hasResubmitRequest: boolean   // true if pending resubmission request exists
 }
 
@@ -229,6 +240,7 @@ export interface OrderDocument {
   storagePath?: string | null
   supersededAt?: string | null
   isActive?: boolean
+  cloudinaryResourceType?: string | null
 }
 
 export interface OrderStatusHistory {
@@ -300,6 +312,18 @@ export interface OrderDetail {
 
   // Raw snapshot (needed for FormationInfo edits)
   formSnapshot: Record<string, unknown>
+
+  // Admin-set company details (EIN, filing ID, addresses, formation date)
+  companyDetails: FormationDetails | null
+
+  // Admin-assigned internal add-ons (services added post-order by admin)
+  internalAddons: InternalAddon[]
+
+  // Billing adjustments (payments, discounts, charges) entered by admin
+  billingEntries: BillingEntry[]
+
+  // Coupon discount applied at checkout (from form_snapshot)
+  couponDiscount: number
 }
 
 // ─── Internal Operations (Chunk 4E) ──────────────────────────────────────────
@@ -337,6 +361,14 @@ export interface InternalAddon {
   removedAt: string | null
 }
 
+export interface BillingEntry {
+  id: string
+  title: string
+  amount: number
+  type: 'discount' | 'charge' | 'payment'
+  createdAt: string
+}
+
 export interface OrderBilling {
   packagePrice: number
   stateFee: number
@@ -367,7 +399,7 @@ export interface Package {
 
 // ─── Users Management System (Chunk 4G) ──────────────────────────────────────────
 
-export type UserRole = 'administrator' | 'manager' | 'customer'
+export type UserRole = 'administrator' | 'manager' | 'customer' | 'b2b_customer'
 
 export interface AdminUser {
   id: string
@@ -392,6 +424,29 @@ export interface UserListResult {
   users: AdminUser[]
   total: number
   totalPages: number
+}
+
+// ─── B2B Customers System ─────────────────────────────────────────────────────
+
+/** A B2B customer (profiles.role = 'b2b_customer') plus their assigned LLC orders. */
+export interface B2BCustomer {
+  id: string
+  email: string
+  fullName: string | null
+  phone: string | null
+  isActive: boolean
+  createdAt: string | null
+  assignedOrderIds: string[]
+  assignedOrderCount: number
+}
+
+/** An LLC order option shown in the admin's assignment multi-select. */
+export interface AssignableOrder {
+  id: string
+  orderNumber: string
+  llcName: string
+  ownerName: string | null
+  ownerEmail: string | null
 }
 
 // ─── PayPal Orders System (Chunk 4I) ──────────────────────────────────────────

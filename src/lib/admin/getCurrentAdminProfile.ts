@@ -5,13 +5,14 @@ import { AdminProfile, UserRole } from '@/types/admin'
 export const getCurrentAdminProfile = cache(async (): Promise<AdminProfile | null> => {
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims()
+    const user = claimsData?.claims
     if (authError || !user) return null
 
     const { data, error } = await supabase
       .from('profiles')
       .select('id, email, full_name, phone, role, avatar_url, is_active, created_at')
-      .eq('id', user.id)
+      .eq('id', user.sub)
       .single()
 
     if (error || !data) return null

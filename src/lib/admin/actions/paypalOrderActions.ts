@@ -9,7 +9,8 @@ const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: '
 
 async function verifyRole(allowedRoles: ('administrator' | 'manager')[]) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ? { id: claimsData.claims.sub } : null;
 
   if (!user) {
     throw new Error('Unauthorized');
@@ -17,11 +18,11 @@ async function verifyRole(allowedRoles: ('administrator' | 'manager')[]) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single();
 
-  if (!profile || !allowedRoles.includes(profile.role as any)) {
+  if (!profile || profile.is_active !== true || !allowedRoles.includes(profile.role as any)) {
     throw new Error('Unauthorized');
   }
 

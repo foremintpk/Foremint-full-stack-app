@@ -13,7 +13,8 @@ function parseCouponCode(raw: string): string {
 
 async function verifyAdminRole() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const user = claimsData?.claims ? { id: claimsData.claims.sub } : null
 
   if (!user) {
     throw new Error('Unauthorized')
@@ -21,11 +22,11 @@ async function verifyAdminRole() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'administrator' && profile.role !== 'manager')) {
+  if (!profile || profile.is_active !== true || (profile.role !== 'administrator' && profile.role !== 'manager')) {
     throw new Error('Unauthorized')
   }
 

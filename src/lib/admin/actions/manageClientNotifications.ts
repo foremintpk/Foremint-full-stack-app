@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidateTag } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { Resend } from 'resend';
@@ -102,16 +103,32 @@ export async function createClientNotification(
 
     if (error || !data) return { success: false, error: error?.message ?? 'Insert failed' };
 
-    // Push to client dashboard notifications table
+    // Resolve the order's owning customer so the notification is delivered to THEM
+    // and clicking it redirects to their copy of the order.
+    const { data: orderRow } = await admin
+      .from('orders')
+      .select('user_id')
+      .eq('id', input.orderId)
+      .single();
+    const recipientId = (orderRow as any)?.user_id ?? null;
+
+    // Encode the admin-chosen category into `type` so the customer dashboard's
+    // category inference (billing/documents/general/addons) maps correctly.
     await admin.from('notifications').insert({
-      type: 'order_update',
-      recipient_id: null, // role-targeted
-      target_role: null,
+      type: `order_${input.category}`,
+      recipient_id: recipientId,
+      target_role: 'customer',
       title: input.title,
       body: input.body ?? null,
       link: `/dashboard/llc/${input.orderId}`,
       is_read: false,
     } as any);
+
+    // Invalidate the recipient's notification + dashboard caches so it shows immediately
+    if (recipientId) {
+      revalidateTag(`notif-list-${recipientId}`, 'max');
+      revalidateTag(`customer-dashboard-${recipientId}`, 'max');
+    }
 
     // Send email if requested
     if (input.sendEmail && input.clientEmail && input.emailSubject && input.emailBody) {
@@ -147,6 +164,57 @@ export async function createClientNotification(
     };
   } catch (err: any) {
     return { success: false, error: err?.message ?? 'Unexpected error' };
+  }
+}
+
+export async function deleteClientNotification(
+  notificationId: string,
+  orderId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: role } = await supabase.rpc('get_my_role');
+    if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
+
+    const admin = createAdminClient();
+
+    // Fetch the admin notification so we can also remove the matching customer-facing row
+    const { data: notif } = await admin
+      .from('order_client_notifications')
+      .select('title, created_at')
+      .eq('id', notificationId)
+      .single();
+
+    const { error } = await admin
+      .from('order_client_notifications')
+      .delete()
+      .eq('id', notificationId);
+    if (error) return { success: false, error: error.message };
+
+    // Best-effort: remove the mirrored row in the customer notifications table
+    if (notif) {
+      const { data: orderRow } = await admin
+        .from('orders')
+        .select('user_id')
+        .eq('id', orderId)
+        .single();
+      const recipientId = (orderRow as any)?.user_id;
+      if (recipientId) {
+        await admin
+          .from('notifications')
+          .delete()
+          .eq('recipient_id', recipientId)
+          .eq('link', `/dashboard/llc/${orderId}`)
+          .eq('title', (notif as any).title);
+        revalidateTag(`notif-list-${recipientId}`, 'max');
+        revalidateTag(`customer-dashboard-${recipientId}`, 'max');
+      }
+    }
+
+    await revalidateOrder(orderId);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message };
   }
 }
 

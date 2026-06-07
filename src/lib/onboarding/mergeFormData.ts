@@ -4,6 +4,7 @@ import type {
   SelectedAddon,
   PaymentMethod,
 } from '@/types/onboarding'
+import { generateUuid } from '@/lib/onboarding-utils'
 
 const EMPTY_FORM: OnboardingFormData = {
   entityType: null,
@@ -36,7 +37,7 @@ const EMPTY_FORM: OnboardingFormData = {
 
 function normalizeMember(raw: Record<string, unknown>, index: number): OnboardingMember {
   return {
-    id: String(raw.id ?? crypto.randomUUID()),
+    id: String(raw.id ?? generateUuid()),
     fullName: String(raw.fullName ?? raw.name ?? ''),
     ssnItin: String(raw.ssnItin ?? ''),
     addressLine1: String(raw.addressLine1 ?? raw.address ?? ''),
@@ -57,8 +58,12 @@ function normalizeAddons(step5: Record<string, unknown>): SelectedAddon[] {
   const raw = step5.selectedAddons
   if (!Array.isArray(raw) || raw.length === 0) return []
 
-  if (typeof raw[0] === 'object' && raw[0] !== null && 'id' in (raw[0] as object)) {
-    return (raw as SelectedAddon[]).map(a => ({
+  // Filter out corrupted entries produced by the old `.map(String)` migration
+  const valid = raw.filter(a => typeof a !== 'string' || (a !== '[object Object]' && a.length > 0))
+  if (valid.length === 0) return []
+
+  if (typeof valid[0] === 'object' && valid[0] !== null && 'id' in (valid[0] as object)) {
+    return (valid as SelectedAddon[]).map(a => ({
       id: a.id,
       name: a.name ?? (a as { title?: string }).title ?? 'Add-on',
       price: Number(a.price ?? 0),

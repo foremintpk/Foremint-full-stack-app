@@ -14,9 +14,10 @@ interface CustomerSidebarProps {
     notifications: number;
     actions: number;
   };
+  isB2B?: boolean;
 }
 
-export function CustomerSidebar({ badgeCounts }: CustomerSidebarProps) {
+export function CustomerSidebar({ badgeCounts, isB2B = false }: CustomerSidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -36,13 +37,20 @@ export function CustomerSidebar({ badgeCounts }: CustomerSidebarProps) {
     setCustomerSidebarCollapsed(nextVal);
   };
 
-  const navItems: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; badgeCount?: number }> = [
-    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Billing', href: '/dashboard/billing', icon: CreditCard, badgeCount: badgeCounts.actions },
-    { label: 'Notifications', href: '/dashboard/notifications', icon: Bell, badgeCount: badgeCounts.notifications },
-    { label: 'Support', href: '/dashboard/support', icon: LifeBuoy },
-    { label: 'Settings', href: '/dashboard/settings', icon: Settings },
-  ];
+  // B2B customers get a trimmed, read-only navigation: Dashboard, Support, Settings.
+  const navItems: Array<{ label: string; href: Route; icon: typeof LayoutDashboard; badgeCount?: number }> = isB2B
+    ? [
+        { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { label: 'Support', href: '/dashboard/support', icon: LifeBuoy },
+        { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+      ]
+    : [
+        { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { label: 'Billing', href: '/dashboard/billing', icon: CreditCard, badgeCount: badgeCounts.actions },
+        { label: 'Notifications', href: '/dashboard/notifications', icon: Bell, badgeCount: badgeCounts.notifications },
+        { label: 'Support', href: '/dashboard/support', icon: LifeBuoy },
+        { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+      ];
 
   if (!mounted) {
     return (
@@ -82,9 +90,9 @@ export function CustomerSidebar({ badgeCounts }: CustomerSidebarProps) {
       <div className="h-14 flex items-center justify-between px-4 border-b border-[#ffffff]/10 flex-shrink-0">
         {!collapsed ? (
           <Link href="/dashboard" className="flex items-center gap-2 mt-4">
-            <Image src="/logo_white.png" alt="Foremint" width={132} height={28} className="h-7 w-auto object-contain" />
+            <Image src="/logo_white.png" alt="Foremint" width={90} height={28} className="h-auto w-auto object-contain" />
             <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full text-white/90">
-              Customer
+              {isB2B ? 'B2B' : 'Customer'}
             </span>
           </Link>
         ) : (

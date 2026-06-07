@@ -30,8 +30,9 @@ export async function POST(
 
     const { userId, receiptUrl, tempSessionKey } = payload
 
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.id !== userId) {
+    const { data: claimsData } = await supabase.auth.getClaims()
+    const user = claimsData?.claims
+    if (!user || user.sub !== userId) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -164,7 +165,6 @@ export async function POST(
         package_price: formData.packagePrice,
         addons_total: formData.addonTotal ?? 0,
         grand_total: grandTotal,
-        discount_pkr: couponDiscountAmount,
         amount: grandTotal,
         status: 'pending',
         payment_status: grandTotal === 0 ? 'paid' : receiptUrl ? 'partial' : 'unpaid',
@@ -175,6 +175,7 @@ export async function POST(
         pricing_snapshot: pricingSnapshot,
         form_snapshot: formSnapshot,
         draft_id: draft.id,
+        discount_pkr: null,
         submitted_at: new Date().toISOString(),
       })
       .select('id, order_number')

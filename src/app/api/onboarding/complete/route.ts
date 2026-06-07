@@ -5,7 +5,8 @@ import { sendWelcomeEmail } from '@/lib/onboarding/complete-onboarding';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims;
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   const { data: uploadedDocs } = await (supabase
     .from('documents')
     .select('document_type')
-    .eq('profile_id', user.id) as any);
+    .eq('profile_id', user.sub) as any);
 
   const uploadedTypes = (uploadedDocs ?? []).map((d: any) => d.document_type);
   const missingDocs = REQUIRED_DOCUMENT_TYPES.filter((t) => !uploadedTypes.includes(t));
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
       onboarding_step: 4,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', user.id));
+    .eq('id', user.sub));
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   const { data: profile } = await ((supabase
     .from('profiles') as any)
     .select('full_name')
-    .eq('id', user.id)
+    .eq('id', user.sub)
     .single());
 
   if (process.env.RESEND_API_KEY) {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
   (supabase.from('notifications') as any).insert({
     type: 'onboarding_completed',
     target_role: 'administrator',
-    payload: { profile_id: user.id, email: user.email },
+    payload: { profile_id: user.sub, email: user.email },
   }).then(() => {}).catch(console.error); // non-blocking
 
   return NextResponse.json({ success: true });

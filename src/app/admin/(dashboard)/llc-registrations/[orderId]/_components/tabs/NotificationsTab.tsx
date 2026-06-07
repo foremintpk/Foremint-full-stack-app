@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Bell, Plus, Send, Loader2, X, Save, MessageSquare,
-  CheckCircle2, Clock, ChevronRight, ArrowLeft, RefreshCw,
+  CheckCircle2, Clock, ChevronRight, ArrowLeft, RefreshCw, Trash2,
 } from 'lucide-react';
 import {
-  createClientNotification, toggleClientNotificationStatus,
+  createClientNotification, toggleClientNotificationStatus, deleteClientNotification,
   type ClientNotification, type NotificationCategory,
 } from '@/lib/admin/actions/manageClientNotifications';
 import {
@@ -278,6 +278,7 @@ export function NotificationsTab({
   const [showForm, setShowForm] = useState(false);
   const [activeTicket, setActiveTicket] = useState<OrderTicket | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleToggle = async (n: ClientNotification) => {
     const newStatus: 'active' | 'inactive' = n.status === 'active' ? 'inactive' : 'active';
@@ -285,6 +286,15 @@ export function NotificationsTab({
     onNotificationUpdated(n.id, { status: newStatus });
     await toggleClientNotificationStatus(n.id, newStatus, orderId, clientEmail, clientName);
     setTogglingId(null);
+  };
+
+  const handleDeleteNotification = async (n: ClientNotification) => {
+    if (!confirm('Delete this notification? It will also be removed from the customer’s dashboard.')) return;
+    setDeletingId(n.id);
+    const res = await deleteClientNotification(n.id, orderId);
+    setDeletingId(null);
+    if (res.success) onRefresh();
+    else alert(res.error || 'Failed to delete notification');
   };
 
   const categoryStyles: Record<string, string> = {
@@ -350,18 +360,28 @@ export function NotificationsTab({
                           </p>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleToggle(n)}
-                        disabled={togglingId === n.id}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all flex-shrink-0 ${
-                          n.status === 'active'
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                            : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                        }`}
-                      >
-                        {togglingId === n.id ? <Loader2 className="w-3 h-3 animate-spin" /> : n.status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                        {n.status === 'active' ? 'Active' : 'Inactive'}
-                      </button>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleToggle(n)}
+                          disabled={togglingId === n.id}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition-all ${
+                            n.status === 'active'
+                              ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
+                          {togglingId === n.id ? <Loader2 className="w-3 h-3 animate-spin" /> : n.status === 'active' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                          {n.status === 'active' ? 'Active' : 'Inactive'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteNotification(n)}
+                          disabled={deletingId === n.id}
+                          title="Delete notification"
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === n.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

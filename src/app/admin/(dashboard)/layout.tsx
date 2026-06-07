@@ -14,7 +14,8 @@
 import { redirect } from 'next/navigation';
 import { getAdminUser } from '@/lib/admin/getAdminUser';
 import { getCachedUnreadNotifications } from '@/lib/admin/getUnreadNotifications';
-import { getCachedUnreadOrderCount } from '@/lib/admin/getUnreadOrderCount';
+import { getUnreadOrderCount } from '@/lib/admin/getUnreadOrderCount';
+import { getAdminBadgeCounts } from '@/lib/admin/actions/getAdminBadgeCounts';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminRole } from '@/types/admin';
 
@@ -32,9 +33,10 @@ export default async function AdminDashboardLayout({
   }
 
   // Pre-fetch unread counts and dynamic arrays (hits Layer 1 server unstable_cache)
-  const [unreadNotifications, unreadOrderCount] = await Promise.all([
+  const [unreadNotifications, unreadOrderCount, badgeCounts] = await Promise.all([
     getCachedUnreadNotifications(admin.id, admin.role as AdminRole),
-    getCachedUnreadOrderCount(admin.id),
+    getUnreadOrderCount(admin.id),
+    getAdminBadgeCounts(),
   ]);
 
   return (
@@ -43,6 +45,7 @@ export default async function AdminDashboardLayout({
       badgeCounts={{
         llcRegistrations: unreadOrderCount,
         notifications: unreadNotifications.length,
+        tickets: badgeCounts.tickets,
       }}
       initialNotifications={unreadNotifications}
     >

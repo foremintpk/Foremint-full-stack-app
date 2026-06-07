@@ -7,7 +7,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { Files, Loader2, UploadCloud, Eye, Trash2, Calendar, FileText, CheckCircle2, Download } from 'lucide-react';
-import { triggerDocumentDownload } from '@/lib/download-file';
 import { deleteDocument } from '@/lib/admin/actions/deleteDocument';
 import type { OrderDocument } from '@/types/admin';
 
@@ -182,7 +181,7 @@ export function DocumentsSection({
  </div>
  <div className="flex items-center gap-1.5 shrink-0">
  <a
- href={latestDoc.url}
+ href={`/api/documents/${latestDoc.id}/view`}
  target="_blank"
  rel="noreferrer"
  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
@@ -190,14 +189,15 @@ export function DocumentsSection({
  >
  <Eye className="w-4 h-4" />
  </a>
- <button
- type="button"
- onClick={() => triggerDocumentDownload(latestDoc.url, latestDoc.fileName)}
+ <a
+ href={`/api/documents/${latestDoc.id}/view?download=1`}
+ target="_blank"
+ rel="noreferrer"
  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
  title="Download Document"
  >
  <Download className="w-4 h-4" />
- </button>
+ </a>
  <button
  onClick={() => handleDelete(latestDoc.id)}
  disabled={deletingId === latestDoc.id}
@@ -238,7 +238,7 @@ export function DocumentsSection({
  </div>
  <div className="flex items-center gap-1">
  <a
- href={doc.url}
+ href={`/api/documents/${doc.id}/view`}
  target="_blank"
  rel="noreferrer"
  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
@@ -246,14 +246,15 @@ export function DocumentsSection({
  >
  <Eye className="w-3.5 h-3.5" />
  </a>
- <button
- type="button"
- onClick={() => triggerDocumentDownload(doc.url, doc.fileName)}
+ <a
+ href={`/api/documents/${doc.id}/view?download=1`}
+ target="_blank"
+ rel="noreferrer"
  className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-all"
  title="Download Old Version"
  >
  <Download className="w-3.5 h-3.5" />
- </button>
+ </a>
  <button
  onClick={() => handleDelete(doc.id)}
  disabled={deletingId === doc.id}
@@ -368,7 +369,7 @@ export function DocumentsSection({
  </div>
  <div className="flex items-center gap-1.5 shrink-0">
  <a
- href={doc.url}
+ href={`/api/documents/${doc.id}/view`}
  target="_blank"
  rel="noreferrer"
  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
@@ -376,14 +377,15 @@ export function DocumentsSection({
  >
  <Eye className="w-4 h-4" />
  </a>
- <button
- type="button"
- onClick={() => triggerDocumentDownload(doc.url, doc.fileName)}
+ <a
+ href={`/api/documents/${doc.id}/view?download=1`}
+ target="_blank"
+ rel="noreferrer"
  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-all"
  title="Download"
  >
  <Download className="w-4 h-4" />
- </button>
+ </a>
  <button
  onClick={() => handleDelete(doc.id)}
  disabled={deletingId === doc.id}

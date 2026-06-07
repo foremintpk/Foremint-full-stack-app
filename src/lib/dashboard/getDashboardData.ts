@@ -1,7 +1,11 @@
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { time } from '@/lib/perf';
 import { formatLlcName } from '../admin/formatters';
+import { computeBillingState } from './billing-utils';
+import { fetchCustomerNotifications } from './customerNotifications';
 import type {
   CustomerDashboardData,
   CustomerLlcItem,
@@ -9,49 +13,149 @@ import type {
   CustomerNotification,
   CustomerInvoiceItem,
   CustomerDashboardStats,
+  Profile,
 } from '@/types/dashboard';
+
+/**
+ * Scope options for the dashboard query.
+ * - Default (omitted): a customer's OWN orders (filtered by user_id).
+ * - assignedOrderIds: B2B "read-only" mode — show only these explicitly assigned
+ *   LLC orders (which belong to other customers). When set, actionable items
+ *   (payments, renewals, resubmissions) are suppressed.
+ */
+interface DashboardScope {
+  assignedOrderIds?: string[];
+  readOnly?: boolean;
+}
 
 async function fetchDashboardDataQuery(
   supabase: any,
   userId: string,
-  fullName: string
+  fullName: string,
+  scope?: DashboardScope,
+  prefetchedProfile?: Profile | null
 ): Promise<CustomerDashboardData> {
-  const { data: profileRow } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+  const isB2B = !!scope?.readOnly;
+
+  // adminSdk: companies/billing_entries have admin-only RLS. Ownership already enforced —
+  // ids come from this customer's own orders, or (B2B) from explicit admin assignments.
+  const adminSdk = createAdminClient();
+
+  // ── Phase 1: independent fetches — none of these depend on each other's
+  // results, so run them concurrently instead of one round trip at a time. ──
+
+  const profilePromise: Promise<any> = prefetchedProfile
+    ? Promise.resolve(prefetchedProfile)
+    : time<any>('dashboard:profile query', () => supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      ).then((r: any) => r.data);
+
+  const ordersPromise: Promise<any[]> = scope?.assignedOrderIds
+    ? (async () => {
+        // B2B mode: assigned orders belong to other users, so read via adminSdk.
+        if (scope.assignedOrderIds!.length === 0) return [];
+        const { data: ordersData, error: ordersError } = await time<any>('dashboard:orders query', () => adminSdk
+          .from('orders')
+          .select('*')
+          .in('id', scope.assignedOrderIds!)
+          .ilike('order_type', '%llc%')
+          .order('created_at', { ascending: false }));
+        if (ordersError) console.error('[fetchDashboardDataQuery B2B ordersError]:', ordersError);
+        return ordersData || [];
+      })()
+    : (async () => {
+        const { data: ordersData, error: ordersError } = await time<any>('dashboard:orders query', () => supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', userId)
+          .ilike('order_type', '%llc%')
+          .order('created_at', { ascending: false }));
+        if (ordersError) console.error('[fetchDashboardDataQuery ordersError]:', ordersError);
+        return ordersData || [];
+      })();
+
+  const notificationsPromise = fetchCustomerNotifications(supabase, userId, isB2B);
+
+  const manualInvoicesPromise: Promise<any[]> = (!isB2B && fullName)
+    ? time<any>('dashboard:invoices query', () => supabase
+        .from('invoices')
+        .select('*')
+        .ilike('name', `%${fullName}%`)
+        .order('date', { ascending: false })
+      ).then((r: any) => r.data || [])
+    : Promise.resolve([]);
+
+  const [profileRow, orders, notificationsData, manualInvoices] = await Promise.all([
+    profilePromise,
+    ordersPromise,
+    notificationsPromise,
+    manualInvoicesPromise,
+  ]);
 
   if (!profileRow) {
     throw new Error('Profile not found');
   }
 
-  const { data: ordersData, error: ordersError } = await supabase
-    .from('orders')
-    .select(`
-      *,
-      companies!company_id (
-        id,
-        company_name,
-        state_renewal_date,
-        state_renewal_fees,
-        ein
-      )
-    `)
-    .eq('user_id', userId)
-    .ilike('order_type', '%llc%')
-    .order('created_at', { ascending: false });
+  const orderIdList = orders.map((o: any) => o.id);
+  const companyIds = orders.map((o: any) => o.company_id).filter(Boolean);
 
-  if (ordersError) {
-    console.error('[fetchDashboardDataQuery ordersError]:', ordersError);
-  }
+  // ── Phase 2: fetches that depend on the resolved order set — independent of
+  // each other, so they also run concurrently once `orders` is known. ──
+  const [companiesRows, entriesRows, receiptDocRows, resubmitRows] = await Promise.all([
+    companyIds.length > 0
+      ? time<any>('dashboard:companies query', () => adminSdk
+          .from('companies')
+          .select('id, company_name, state_renewal_date, state_renewal_fees, formation_date, ein')
+          .in('id', companyIds)
+        ).then((r: any) => r.data || [])
+      : Promise.resolve([]),
+    orderIdList.length > 0
+      ? time<any>('dashboard:billing query', () => adminSdk
+          .from('billing_entries')
+          .select('order_id, amount, type')
+          .in('order_id', orderIdList)
+        ).then((r: any) => r.data || [])
+      : Promise.resolve([]),
+    orderIdList.length > 0
+      ? time<any>('dashboard:receipts query', () => adminSdk
+          .from('documents')
+          .select('id, order_id')
+          .in('order_id', orderIdList)
+          .eq('slot_key', 'payment_receipt')
+          .is('superseded_at', null)
+        ).then((r: any) => r.data || [])
+      : Promise.resolve([]),
+    (!isB2B && orderIdList.length > 0)
+      ? time<any>('dashboard:resubmissions query', () => supabase
+          .from('document_resubmission_requests')
+          .select('*')
+          .in('order_id', orderIdList)
+          .eq('status', 'pending')
+        ).then((r: any) => r.data || [])
+      : Promise.resolve([]),
+  ]);
 
-  const orders = ordersData || [];
+  // Companies
+  const companiesMap: Record<string, any> = {};
+  companiesRows.forEach((c: any) => { companiesMap[c.id] = c; });
+
+  // Billing entries (single source of truth for pending/paid) — grouped by order
+  const billingByOrder: Record<string, { amount: number; type: 'charge' | 'discount' | 'payment' }[]> = {};
+  entriesRows.forEach((e: any) => {
+    (billingByOrder[e.order_id] ??= []).push({ amount: Number(e.amount || 0), type: e.type });
+  });
+
+  // Payment-receipt documents — map order_id → active receipt doc id (for proxied API link)
+  const receiptDocByOrder: Record<string, string> = {};
+  receiptDocRows.forEach((d: any) => { receiptDocByOrder[d.order_id] = d.id; });
 
   const llcs: CustomerLlcItem[] = [];
   orders.forEach((o: any) => {
-    const company = o.companies;
     const companyId = o.company_id;
+    const company = companyId ? companiesMap[companyId] : null;
 
     let complianceState: CustomerLlcItem['complianceState'] = 'unknown';
     if (o.status === 'completed' || o.status === 'confirmed') {
@@ -72,6 +176,9 @@ async function fetchDashboardDataQuery(
     const formSnapshot = o.form_snapshot || {};
     const rawBusinessName = formSnapshot?.step3?.businessName ?? formSnapshot?.businessName ?? '';
 
+    // Canonical billing state — same formula as admin + order billing tab
+    const billing = computeBillingState(Number(o.grand_total || 0), billingByOrder[o.id] || []);
+
     llcs.push({
       id: o.id,
       companyId: companyId,
@@ -80,22 +187,14 @@ async function fetchDashboardDataQuery(
       formationState: o.formation_state || formSnapshot?.step2?.state || null,
       formationStateName: o.formation_state_name || formSnapshot?.step2?.stateName || null,
       renewalDate: company?.state_renewal_date || null,
-      pendingAmount: o.payment_status !== 'paid' ? Number(o.grand_total || 0) : 0,
-      paymentStatus: o.payment_status,
+      formationDate: company?.formation_date || null,
+      pendingAmount: billing.pending,
+      paymentStatus: billing.status,
       complianceState,
     });
   });
 
-  const orderIds = orders.map((o: any) => o.id);
-  let pendingResubmissions: any[] = [];
-  if (orderIds.length > 0) {
-    const { data: resubmits } = await supabase
-      .from('document_resubmission_requests')
-      .select('*')
-      .in('order_id', orderIds)
-      .eq('status', 'pending');
-    pendingResubmissions = resubmits || [];
-  }
+  const pendingResubmissions: any[] = resubmitRows;
 
   const actions: CustomerActionRequired[] = [];
 
@@ -119,27 +218,28 @@ async function fetchDashboardDataQuery(
     });
   });
 
-  llcs.forEach((llc) => {
+  // B2B customers have read-only access — no payment / renewal actions for them.
+  if (!isB2B) llcs.forEach((llc) => {
     if (llc.paymentStatus !== 'paid') {
       const orderRecord = orders.find((o: any) => o.id === llc.id);
       actions.push({
         id: `pay-${llc.id}`,
         type: 'invoice_payment',
         title: `Complete Payment for ${llc.llcName}`,
-        description: `Pending balance: $${orderRecord?.grand_total || 0}. Please upload bank transfer proof or use card payment.`,
+        description: `Pending balance: $${llc.pendingAmount.toLocaleString()}. Please upload your bank transfer receipt.`,
         dueDate: null,
         priority: 'high',
         llcId: llc.id,
         llcName: llc.llcName,
         metadata: {
-          amount: Number(orderRecord?.grand_total || 0),
+          amount: llc.pendingAmount,
           invoiceNumber: orderRecord?.order_number || '',
         },
       });
     }
   });
 
-  llcs.forEach((llc) => {
+  if (!isB2B) llcs.forEach((llc) => {
     if (llc.complianceState === 'renewal_due') {
       const companyRecord = orders.find((o: any) => o.id === llc.id)?.companies;
       actions.push({
@@ -159,37 +259,7 @@ async function fetchDashboardDataQuery(
     }
   });
 
-  const { data: notificationsData } = await supabase
-    .from('notifications')
-    .select('id, title, body, type, link, is_read, created_at, payload')
-    .or(`recipient_id.eq.${userId},and(recipient_id.is.null,target_role.eq.customer)`)
-    .order('created_at', { ascending: false })
-    .limit(30);
-
-  const notifications: CustomerNotification[] = (notificationsData || []).map((n: any) => {
-    let category: CustomerNotification['category'] = 'general';
-    const typeLower = (n.type || '').toLowerCase();
-    if (typeLower.includes('billing') || typeLower.includes('payment') || typeLower.includes('invoice')) {
-      category = 'billing';
-    } else if (typeLower.includes('compliance') || typeLower.includes('filing')) {
-      category = 'compliance';
-    } else if (typeLower.includes('renewal')) {
-      category = 'renewal';
-    } else if (typeLower.includes('document') || typeLower.includes('resubmit') || typeLower.includes('reject')) {
-      category = 'document';
-    }
-
-    return {
-      id: n.id,
-      title: n.title || 'Notification',
-      body: n.body,
-      type: n.type,
-      link: n.link,
-      isRead: !!n.is_read,
-      createdAt: n.created_at || new Date().toISOString(),
-      category,
-    };
-  });
+  const notifications: CustomerNotification[] = notificationsData;
 
   const invoices: CustomerInvoiceItem[] = [];
 
@@ -198,39 +268,41 @@ async function fetchDashboardDataQuery(
     const rawBusinessName = formSnapshot?.step3?.businessName ?? formSnapshot?.businessName ?? '';
     const nameLabel = formatLlcName(rawBusinessName || `LLC Formation Order ${o.order_number}`);
 
+    // Canonical billing state
+    const billing = computeBillingState(Number(o.grand_total || 0), billingByOrder[o.id] || []);
+    // Proxy the receipt through our API — never expose the raw Cloudinary URL
+    const receiptDocId = receiptDocByOrder[o.id];
+
     invoices.push({
       id: o.id,
       invoiceNumber: o.order_number || `ORD-${o.id.slice(0, 8).toUpperCase()}`,
       date: o.submitted_at || o.created_at,
       name: nameLabel,
-      amount: Number(o.grand_total || 0),
-      status: o.payment_status as any,
+      amount: billing.effective,
+      paidAmount: billing.payments,
+      pendingAmount: billing.pending,
+      status: billing.status,
       type: 'order',
       notes: o.notes,
-      downloadUrl: o.payment_receipt_url,
+      downloadUrl: receiptDocId ? `/api/documents/${receiptDocId}/view` : null,
     });
   });
 
-  if (fullName) {
-    const { data: manualInvoices } = await supabase
-      .from('invoices')
-      .select('*')
-      .ilike('name', `%${fullName}%`)
-      .order('date', { ascending: false });
-
-    (manualInvoices || []).forEach((row: any) => {
-      invoices.push({
-        id: row.id,
-        invoiceNumber: row.invoice_number,
-        date: row.date,
-        name: row.name,
-        amount: Number(row.total_amount_pkr) || 0,
-        status: 'paid',
-        type: 'manual',
-        notes: row.notes,
-      });
+  manualInvoices.forEach((row: any) => {
+    const manualAmount = Number(row.total_amount_pkr) || 0;
+    invoices.push({
+      id: row.id,
+      invoiceNumber: row.invoice_number,
+      date: row.date,
+      name: row.name,
+      amount: manualAmount,
+      paidAmount: manualAmount,
+      pendingAmount: 0,
+      status: 'paid',
+      type: 'manual',
+      notes: row.notes,
     });
-  }
+  });
 
   const totalLlcs = llcs.length;
   const activeLlcs = llcs.filter((l) => l.status === 'completed' || l.status === 'confirmed').length;
@@ -264,11 +336,17 @@ async function fetchDashboardDataQuery(
   };
 }
 
-export async function getDashboardData(userId: string, fullName: string): Promise<CustomerDashboardData> {
+export async function getDashboardData(
+  userId: string,
+  fullName: string,
+  prefetchedProfile?: Profile | null
+): Promise<CustomerDashboardData> {
   const supabase = await createClient();
+  // Captured via closure (not passed into unstable_cache's args) so the cache
+  // key is unchanged — it's only used to skip a redundant query on cache misses.
   return unstable_cache(
     async (id: string, name: string) => {
-      return fetchDashboardDataQuery(supabase, id, name);
+      return fetchDashboardDataQuery(supabase, id, name, undefined, prefetchedProfile);
     },
     [`customer-dashboard-${userId}`],
     {
@@ -280,7 +358,57 @@ export async function getDashboardData(userId: string, fullName: string): Promis
 
 export const getCachedDashboardData = cache(async (
   userId: string,
-  fullName: string
+  fullName: string,
+  prefetchedProfile?: Profile | null
 ) => {
-  return getDashboardData(userId, fullName);
+  return getDashboardData(userId, fullName, prefetchedProfile);
+});
+
+// ── B2B (read-only) dashboard ────────────────────────────────────────────────
+
+/** Returns the LLC order ids explicitly assigned to a B2B customer. */
+export async function getB2BAssignedOrderIds(userId: string): Promise<string[]> {
+  const adminSdk = createAdminClient();
+  const { data, error } = await adminSdk
+    .from('b2b_order_assignments')
+    .select('order_id')
+    .eq('b2b_user_id', userId);
+  if (error) {
+    console.error('[getB2BAssignedOrderIds] error:', error);
+    return [];
+  }
+  return (data || []).map((r: any) => r.order_id);
+}
+
+/**
+ * Dashboard data for a B2B customer — only their assigned LLC orders, read-only.
+ */
+export async function getB2BDashboardData(
+  userId: string,
+  fullName: string,
+  prefetchedProfile?: Profile | null
+): Promise<CustomerDashboardData> {
+  const supabase = await createClient();
+  const assignedOrderIds = await getB2BAssignedOrderIds(userId);
+  return unstable_cache(
+    async (id: string, name: string, ids: string[]) => {
+      return fetchDashboardDataQuery(supabase, id, name, {
+        assignedOrderIds: ids,
+        readOnly: true,
+      }, prefetchedProfile);
+    },
+    [`b2b-dashboard-${userId}`],
+    {
+      revalidate: 30,
+      tags: [`customer-dashboard-${userId}`, `b2b-assignments-${userId}`, `notif-list-${userId}`],
+    }
+  )(userId, fullName, assignedOrderIds);
+}
+
+export const getCachedB2BDashboardData = cache(async (
+  userId: string,
+  fullName: string,
+  prefetchedProfile?: Profile | null
+) => {
+  return getB2BDashboardData(userId, fullName, prefetchedProfile);
 });

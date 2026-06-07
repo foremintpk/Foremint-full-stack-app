@@ -11,7 +11,8 @@ interface InvoiceTableProps {
 
 export async function InvoiceTable({ invoices }: InvoiceTableProps) {
   const supabase = await createClient();
-  const { data: { user: sessionUser } } = await supabase.auth.getUser();
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const sessionUser = claimsData?.claims;
 
   if (!sessionUser) {
     return null;
@@ -20,7 +21,7 @@ export async function InvoiceTable({ invoices }: InvoiceTableProps) {
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
-    .eq('id', sessionUser.id)
+    .eq('id', sessionUser.sub)
     .single();
 
   const currentAdminRole = (profile?.role || 'customer') as UserRole;
@@ -88,9 +89,9 @@ export async function InvoiceTable({ invoices }: InvoiceTableProps) {
       </div>
 
       {/* Desktop Grid Table View */}
-      <div className="hidden md:block w-full border border-[#e0d9f7] rounded-2xl overflow-hidden bg-white shadow-[0_1px_4px_rgba(52,8,143,0.06)]">
+      <div className="hidden md:block w-full border border-[#e0d9f7] rounded-2xl bg-white shadow-[0_1px_4px_rgba(52,8,143,0.06)]">
         {/* Table Header */}
-        <div className="grid grid-cols-[1fr_1.5fr_1fr_1.2fr_1.2fr_0.6fr] gap-4 px-6 py-3.5 bg-[#f4f0fe] border-b border-[#e0d9f7] text-xs font-semibold text-[#34088f] uppercase tracking-wider select-none font-manrope">
+        <div className="grid grid-cols-[1fr_1.5fr_1fr_1.2fr_1.2fr_0.6fr] gap-4 px-6 py-3.5 bg-[#f4f0fe] border-b border-[#e0d9f7] rounded-t-2xl text-xs font-semibold text-[#34088f] uppercase tracking-wider select-none font-manrope">
           <div>Invoice #</div>
           <div>Client / Customer</div>
           <div>Date</div>
@@ -100,7 +101,7 @@ export async function InvoiceTable({ invoices }: InvoiceTableProps) {
         </div>
 
         {/* Rows */}
-        <div className="divide-y divide-[#e0d9f7]">
+        <div className="divide-y divide-[#e0d9f7] [&>*:last-child]:rounded-b-2xl">
           {invoices.map((invoice) => (
             <InvoiceRow
               key={invoice.id}
