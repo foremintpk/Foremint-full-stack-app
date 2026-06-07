@@ -71,6 +71,11 @@ function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? ''
 }
 
+function getLogoUrl(): string {
+  const base = getAppUrl()
+  return base ? `${base}/logo/blue.png` : ''
+}
+
 // ─── Customer Order Confirmation ──────────────────────────────────────────────
 
 /**
@@ -102,7 +107,7 @@ export async function sendOrderConfirmationEmail(
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to,
-    subject: '🎉 Congratulations! Your LLC Order Has Been Received',
+    subject: 'Your LLC Order Has Been Received — Foremint',
     html: OrderCreatedEmailHtml({
       userName,
       orderNumber,
@@ -112,6 +117,7 @@ export async function sendOrderConfirmationEmail(
       formationState,
       dashboardUrl,
       orderDate: displayDate,
+      logoUrl: getLogoUrl(),
     }),
   })
 
@@ -160,7 +166,7 @@ export async function sendAdminOrderNotificationEmail(
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: adminEmail,
-    subject: `📩 New LLC Order Received — ${customerName}`,
+    subject: `New LLC Order Received — ${customerName}`,
     html: AdminOrderNotificationHtml({
       customerName,
       customerEmail,
@@ -172,6 +178,7 @@ export async function sendAdminOrderNotificationEmail(
       grandTotal,
       orderDate,
       adminDashboardUrl,
+      logoUrl: getLogoUrl(),
     }),
   })
 
@@ -218,7 +225,7 @@ export async function sendAdminReceiptUploadedEmail(
   const { error } = await resend.emails.send({
     from: FROM_ADDRESS,
     to: adminEmail,
-    subject: `🧾 Payment Receipt Uploaded — ${businessName} (${customerName})`,
+    subject: `Payment Receipt Uploaded — ${businessName} (${customerName})`,
     html: AdminReceiptUploadedHtml({
       customerName,
       customerEmail,
@@ -228,6 +235,7 @@ export async function sendAdminReceiptUploadedEmail(
       pendingAmount,
       uploadedAt: formatDate(),
       adminDashboardUrl,
+      logoUrl: getLogoUrl(),
     }),
   })
 

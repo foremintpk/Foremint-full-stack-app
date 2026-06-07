@@ -123,6 +123,13 @@ export async function proxy(request: NextRequest) {
         response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
         return redirectRes;
       }
+      if (userRole === "b2b_customer") {
+        const redirectUrl = request.nextUrl.clone();
+        redirectUrl.pathname = "/dashboard";
+        const redirectRes = NextResponse.redirect(redirectUrl);
+        response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+        return redirectRes;
+      }
     }
     return response;
   }

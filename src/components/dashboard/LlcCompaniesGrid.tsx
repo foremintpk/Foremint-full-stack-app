@@ -32,7 +32,7 @@ function CompanyAvatar() {
   );
 }
 
-export function LlcCompaniesGrid({ llcs }: { llcs: CustomerLlcItem[] }) {
+export function LlcCompaniesGrid({ llcs, isB2B = false }: { llcs: CustomerLlcItem[]; isB2B?: boolean }) {
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -67,14 +67,16 @@ export function LlcCompaniesGrid({ llcs }: { llcs: CustomerLlcItem[] }) {
               className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-gray-200 bg-gray-50 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f]/50 font-inter transition-all"
             />
           </div>
-          {/* New LLC button */}
-          <Link
-            href="/onboarding"
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#34088f] text-white text-xs font-semibold hover:bg-[#2a0673] transition-colors font-inter whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New LLC
-          </Link>
+          {/* New LLC button — hidden for B2B customers */}
+          {!isB2B && (
+            <Link
+              href="/onboarding"
+              className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#34088f] text-white text-xs font-semibold hover:bg-[#2a0673] transition-colors font-inter whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New LLC
+            </Link>
+          )}
         </div>
       </div>
 
@@ -86,15 +88,19 @@ export function LlcCompaniesGrid({ llcs }: { llcs: CustomerLlcItem[] }) {
           </div>
           <p className="text-sm font-semibold text-gray-900 font-manrope">No companies yet</p>
           <p className="text-xs text-gray-500 font-inter mt-1">
-            Your LLC registrations will appear here once submitted.
+            {isB2B
+              ? 'No LLCs have been shared with your account yet.'
+              : 'Your LLC registrations will appear here once submitted.'}
           </p>
-          <Link
-            href="/onboarding"
-            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#34088f] text-white text-sm font-semibold hover:bg-[#2a0673] transition-colors font-inter"
-          >
-            Start a New LLC
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          {!isB2B && (
+            <Link
+              href="/onboarding"
+              className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#34088f] text-white text-sm font-semibold hover:bg-[#2a0673] transition-colors font-inter"
+            >
+              Start a New LLC
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          )}
         </div>
       ) : filtered.length === 0 ? (
         <div className="py-12 text-center">

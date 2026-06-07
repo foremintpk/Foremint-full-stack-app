@@ -81,7 +81,7 @@ export default async function DashboardOverviewPage() {
       </div>
 
       {/* ── Companies (LLCs) Grid ──────────────────────────────────── */}
-      <LlcCompaniesGrid llcs={llcs} />
+      <LlcCompaniesGrid llcs={llcs} isB2B={isB2B} />
     </div>
   );
 }
