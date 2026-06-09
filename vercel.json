@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/ticket-escalations",
-      "schedule": "0 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
