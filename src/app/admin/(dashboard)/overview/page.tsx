@@ -59,9 +59,9 @@ export default async function AdminOverviewPage({ searchParams }: PageProps) {
           iconColor="text-[#10b981]"
           total={stats.llc.total}
           stats={[
-            { label: 'Pending',    value: stats.llc.pending,    statusKey: 'pending' },
-            { label: 'Processing', value: stats.llc.processing, statusKey: 'processing' },
-            { label: 'Completed',  value: stats.llc.completed,  statusKey: 'completed' },
+            { label: 'Pending',     value: stats.llc.pending,    statusKey: 'pending' },
+            { label: 'In Progress', value: stats.llc.inProgress, statusKey: 'inProgress' },
+            { label: 'Formed',      value: stats.llc.formed,     statusKey: 'formed' },
           ]}
         />
 

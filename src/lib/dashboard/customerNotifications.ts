@@ -1,4 +1,3 @@
-import { time } from '@/lib/perf';
 import type { CustomerNotification } from '@/types/dashboard';
 
 /**
@@ -12,8 +11,7 @@ import type { CustomerNotification } from '@/types/dashboard';
 export async function fetchCustomerNotifications(
   supabase: any,
   userId: string,
-  isB2B: boolean,
-  perfLabel = 'dashboard:notifications query'
+  isB2B: boolean
 ): Promise<CustomerNotification[]> {
   let query = supabase
     .from('notifications')
@@ -22,9 +20,9 @@ export async function fetchCustomerNotifications(
     ? query.eq('recipient_id', userId)
     : query.or(`recipient_id.eq.${userId},and(recipient_id.is.null,target_role.eq.customer)`);
 
-  const { data } = await time<any>(perfLabel, () => query
+  const { data } = await query
     .order('created_at', { ascending: false })
-    .limit(30));
+    .limit(30);
 
   return (data || []).map((n: any) => {
     let category: CustomerNotification['category'] = 'general';

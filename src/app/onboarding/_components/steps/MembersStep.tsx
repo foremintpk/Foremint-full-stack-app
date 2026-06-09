@@ -15,7 +15,6 @@ function createMember(index: number, isMultiMember: boolean): OnboardingMember {
   return {
     id: generateUuid(),
     fullName: '',
-    ssnItin: '',
     addressLine1: '',
     addressLine2: '',
     city: '',

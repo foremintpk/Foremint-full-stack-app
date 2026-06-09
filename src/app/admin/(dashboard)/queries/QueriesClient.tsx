@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useRealtime } from '@/components/realtime/RealtimeProvider';
 import {
   getTicketMessages, sendTicketMessage, updateTicketStatus, deleteTicket,
   type AdminTicket, type TicketMessage,
@@ -40,8 +41,8 @@ function ChatPanel({ ticket, adminId, onStatusChanged, onDeleted }: {
   const [sending, setSending] = useState(false);
   const [isInternal, setIsInternal] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const channelRef = useRef<any>(null);
-  const supabase = useMemo(() => createClient(), []);
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const supabase = useRealtime();
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
@@ -50,6 +51,7 @@ function ChatPanel({ ticket, adminId, onStatusChanged, onDeleted }: {
     setLoading(false);
   }, [ticket.id]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void fetchMessages(); }, [fetchMessages]);
 
   // Broadcast channel — RLS-independent, bidirectional with the customer side.

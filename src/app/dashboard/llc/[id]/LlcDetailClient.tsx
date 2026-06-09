@@ -917,8 +917,8 @@ function ComplianceTab({ llc }: { llc: OrderDetail }) {
     },
     {
       label: 'Formation Processing',
-      status: ['completed', 'formed'].includes(llc.status) ? 'done' : llc.status === 'processing' ? 'warning' : 'pending',
-      detail: ['completed', 'formed'].includes(llc.status) ? 'LLC successfully formed' : llc.status === 'processing' ? 'Currently being processed' : 'Awaiting processing',
+      status: llc.status === 'formed' ? 'done' : ['initialized', 'submitted_in_state', 'ein_pending'].includes(llc.status) ? 'warning' : 'pending',
+      detail: llc.status === 'formed' ? 'LLC successfully formed' : ['initialized', 'submitted_in_state', 'ein_pending'].includes(llc.status) ? 'Currently being processed' : 'Awaiting processing',
     },
   ];
 

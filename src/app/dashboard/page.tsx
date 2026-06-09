@@ -6,6 +6,7 @@
 import { redirect } from 'next/navigation';
 import { getSession, isB2BRole } from '@/lib/auth/get-session';
 import { getCachedDashboardData, getCachedB2BDashboardData } from '@/lib/dashboard/getDashboardData';
+import { createAdminClient } from '@/lib/supabase/admin';
 import {
   Building2, AlertTriangle, CreditCard, RotateCcw, TrendingUp,
 } from 'lucide-react';
@@ -29,13 +30,42 @@ export default async function DashboardOverviewPage() {
   const { stats, llcs, actions } = data;
   const firstName = session.profile.full_name?.split(' ')[0] || 'there';
 
+  // For regular customers only: check if any of their LLC orders are assigned
+  // to a B2B company. If so, show "Managed By: [B2B company name]" as a subtitle.
+  // B2B users themselves never see this label on their own dashboard.
+  let managedByName: string | null = null;
+  if (!isB2B && llcs.length > 0) {
+    const orderIds = llcs.map((llc) => llc.id);
+    const adminSdk = createAdminClient();
+    const { data: assignment } = await adminSdk
+      .from('b2b_order_assignments')
+      .select('b2b_user_id')
+      .in('order_id', orderIds)
+      .limit(1)
+      .maybeSingle();
+    if (assignment?.b2b_user_id) {
+      const { data: b2bProfile } = await adminSdk
+        .from('profiles')
+        .select('full_name, company_name')
+        .eq('id', assignment.b2b_user_id)
+        .maybeSingle();
+      managedByName =
+        (b2bProfile?.company_name ?? b2bProfile?.full_name) || null;
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* ── Page Header ─────────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-black text-gray-900 font-manrope">
-          Welcome back, {firstName} 👋
+          Welcome back, {firstName}
         </h1>
+        {managedByName && (
+          <p className="text-sm font-semibold text-[#34088f] mt-0.5 font-inter">
+            Managed By: {managedByName}
+          </p>
+        )}
         <p className="text-sm text-gray-500 mt-1 font-inter">
           {isB2B
             ? "Here's an overview of the LLCs shared with you (read-only)."

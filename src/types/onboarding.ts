@@ -159,7 +159,6 @@ export type MemberPosition = 'co-founder' | 'manager'
 export interface OnboardingMember {
   id: string              // client-side uuid, e.g. crypto.randomUUID()
   fullName: string
-  ssnItin: string         // optional, encrypted via onboarding_sensitive_data
   addressLine1: string
   addressLine2: string
   city: string

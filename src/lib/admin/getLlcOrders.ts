@@ -67,10 +67,7 @@ async function fetchLlcOrders(
       .eq('admin_order_views.admin_id', adminId);
 
     if (filters.status !== 'all') {
-      let dbStatus: string = filters.status;
-      if (filters.status === 'processing') dbStatus = 'in_progress';
-      else if (filters.status === 'formed') dbStatus = 'completed';
-      query = query.eq('status', dbStatus as any);
+      query = query.eq('status', filters.status);
     }
 
     if (filters.dateFilter !== 'all') {
@@ -124,10 +121,7 @@ async function fetchLlcOrders(
 
       const grandTotal = Number(row.grand_total) || 0;
 
-      let llcStatus: LlcOrderStatus = 'pending';
-      if (row.status === 'in_progress') llcStatus = 'processing';
-      else if (row.status === 'completed' || row.status === 'confirmed') llcStatus = 'formed';
-      else if (row.status === 'cancelled') llcStatus = 'cancelled';
+      const llcStatus: LlcOrderStatus = (row.status as LlcOrderStatus) || 'pending';
 
       return {
         id: row.id,
@@ -168,14 +162,18 @@ async function fetchLlcOrders(
     const statsRaw = statsData || [];
     const statsTotal = statsRaw.length;
     let pending = 0;
-    let processing = 0;
+    let initialized = 0;
+    let submittedInState = 0;
+    let einPending = 0;
     let formed = 0;
 
     statsRaw.forEach((s) => {
       const st = s.status;
       if (st === 'pending') pending++;
-      else if (st === 'in_progress') processing++;
-      else if (st === 'completed' || st === 'confirmed') formed++;
+      else if (st === 'initialized') initialized++;
+      else if (st === 'submitted_in_state') submittedInState++;
+      else if (st === 'ein_pending') einPending++;
+      else if (st === 'formed') formed++;
     });
 
     return {
@@ -186,7 +184,9 @@ async function fetchLlcOrders(
       stats: {
         total: statsTotal,
         pending,
-        processing,
+        initialized,
+        submittedInState,
+        einPending,
         formed,
       },
     };
@@ -207,7 +207,7 @@ async function fetchLlcOrders(
   ].filter(Boolean).join('_') || 'all';
 
   return unstable_cache(
-    async (fk: string): Promise<LlcListResult> => {
+    async (): Promise<LlcListResult> => {
       return runQuery(supabase);
     },
     [`order-list-llc-${filterKey}`],
@@ -215,7 +215,7 @@ async function fetchLlcOrders(
       revalidate: 60,
       tags: ['order-list-llc', `order-list-llc-${filterKey}`],
     }
-  )(filterKey);
+  )();
 }
 
 export const getLlcOrders = cache(fetchLlcOrders);

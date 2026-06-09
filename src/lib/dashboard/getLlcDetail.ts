@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hydrateSupabaseDocumentUrls } from '@/lib/storage/document-urls';
 import { getSession } from '@/lib/auth/get-session';
-import { time } from '@/lib/perf';
 import { formatLlcName } from '../admin/formatters';
 import type { OrderDetail, OrderDocument, OrderMember, OrderStatusHistory, ResubmissionRequest, FormationDetails, InternalAddon, BillingEntry } from '@/types/admin';
 import { computeBillingState } from './billing-utils';
@@ -44,7 +43,7 @@ async function fetchLlcDetailQuery(
     orderQuery = orderQuery.eq('user_id', userId);
   }
 
-  const { data: orderRes, error: orderError } = await time<any>('llcDetail:order query', () => orderQuery.single());
+  const { data: orderRes, error: orderError } = await orderQuery.single();
 
   if (orderError || !orderRes) {
     console.error('[fetchLlcDetailQuery Error]:', orderError);
@@ -62,17 +61,17 @@ async function fetchLlcDetailQuery(
   //    PostgREST and hits the DB directly, so it always sees all columns.
   let company: any = null;
   if (order.company_id) {
-    const { data: companyData } = await time<any>('llcDetail:company query', () => adminSdk
+    const { data: companyData } = await adminSdk
       .from('companies')
       .select('*')
       .eq('id', order.company_id)
-      .single());
+      .single();
     company = companyData;
   }
 
   // RLS policy "Customers can read order documents" enforces access.
   // billing_entries use adminSdk — only admins can read them via RLS.
-  const [docsRes, historyRes, resubmitRes, internalAddonsRes, billingEntriesRes] = await time<any>('llcDetail:related records query (parallel x5)', () => Promise.all([
+  const [docsRes, historyRes, resubmitRes, internalAddonsRes, billingEntriesRes] = await Promise.all([
     supabase
       .from('documents')
       .select('*')
@@ -106,7 +105,7 @@ async function fetchLlcDetailQuery(
       .select('*')
       .eq('order_id', orderId)
       .order('created_at', { ascending: true }),
-  ]));
+  ]);
 
   const clientDocs = (docsRes.data || []) as any[];
 
@@ -202,11 +201,11 @@ async function fetchLlcDetailQuery(
     null;
 
   if (!formationPackageName && packageId) {
-    const { data: packageRow } = await time<any>('llcDetail:package name query', () => supabase
+    const { data: packageRow } = await supabase
       .from('packages')
       .select('name')
       .eq('id', packageId)
-      .maybeSingle());
+      .maybeSingle();
 
     formationPackageName = packageRow?.name ?? null;
   }

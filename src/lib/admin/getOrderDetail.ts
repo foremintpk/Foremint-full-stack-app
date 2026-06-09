@@ -207,13 +207,7 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
     return {
       id: order.id,
       orderNumber: order.order_number || '',
-      // Map raw DB enum values to the UI status aliases used by StatusDropdown
-      status: (() => {
-        const s = order.status as string;
-        if (s === 'in_progress') return 'processing' as OrderStatus;
-        if (s === 'completed' || s === 'confirmed') return 'formed' as OrderStatus;
-        return s as OrderStatus;
-      })(),
+      status: (order.status as OrderStatus) || 'pending',
       paymentStatus: order.payment_status as any,
       llcName: formatLlcName(rawBusinessName),
       formationState: order.formation_state || formSnapshot?.step2?.state || null,

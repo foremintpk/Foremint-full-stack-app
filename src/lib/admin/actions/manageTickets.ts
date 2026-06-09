@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendAdminReplyCustomerEmail } from '@/lib/email/sendTicketEmails';
 
 export interface OrderTicket {
   id: string;
@@ -27,6 +28,8 @@ export interface AdminTicket {
   lastMessage: string | null;
 }
 
+type RawRow = Record<string, unknown>;
+
 /** All support tickets across all customers, newest activity first. */
 export async function getAllTickets(): Promise<AdminTicket[]> {
   try {
@@ -40,23 +43,24 @@ export async function getAllTickets(): Promise<AdminTicket[]> {
       `)
       .order('updated_at', { ascending: false });
 
-    return (data || []).map((q: any) => {
-      const msgs = Array.isArray(q.query_messages) ? q.query_messages : [];
+    return (data as RawRow[] || []).map((q) => {
+      const msgs = Array.isArray(q.query_messages) ? (q.query_messages as RawRow[]) : [];
       const lastMsg = msgs
         .slice()
-        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        .sort((a, b) => new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime())[0];
+      const profile = q.profiles as RawRow | null;
       return {
-        id: q.id,
-        subject: q.subject,
-        status: q.status,
-        userId: q.user_id,
-        customerName: q.profiles?.full_name ?? null,
-        customerEmail: q.profiles?.email ?? null,
-        orderId: q.order_id ?? null,
-        createdAt: q.created_at,
-        updatedAt: q.updated_at,
+        id: q.id as string,
+        subject: q.subject as string,
+        status: q.status as string,
+        userId: q.user_id as string,
+        customerName: (profile?.full_name as string | null) ?? null,
+        customerEmail: (profile?.email as string | null) ?? null,
+        orderId: (q.order_id as string | null) ?? null,
+        createdAt: q.created_at as string,
+        updatedAt: q.updated_at as string,
         messageCount: msgs.length,
-        lastMessage: lastMsg?.content ?? null,
+        lastMessage: (lastMsg?.content as string | null) ?? null,
       };
     });
   } catch {
@@ -87,14 +91,14 @@ export async function getOrderTickets(orderId: string): Promise<OrderTicket[]> {
       .eq('order_id', orderId)
       .order('created_at', { ascending: false });
 
-    return (data || []).map((q: any) => ({
-      id: q.id,
-      subject: q.subject,
-      status: q.status,
-      userId: q.user_id,
-      createdAt: q.created_at,
-      updatedAt: q.updated_at,
-      messageCount: Array.isArray(q.query_messages) ? q.query_messages.length : 0,
+    return (data as RawRow[] || []).map((q) => ({
+      id: q.id as string,
+      subject: q.subject as string,
+      status: q.status as string,
+      userId: q.user_id as string,
+      createdAt: q.created_at as string,
+      updatedAt: q.updated_at as string,
+      messageCount: Array.isArray(q.query_messages) ? (q.query_messages as RawRow[]).length : 0,
     }));
   } catch {
     return [];
@@ -113,16 +117,19 @@ export async function getTicketMessages(queryId: string): Promise<TicketMessage[
       .eq('query_id', queryId)
       .order('created_at', { ascending: true });
 
-    return (data || []).map((m: any) => ({
-      id: m.id,
-      queryId: m.query_id,
-      senderId: m.sender_id,
-      senderName: m.profiles?.full_name ?? null,
-      senderRole: m.profiles?.role ?? 'customer',
-      content: m.content,
-      isInternal: m.is_internal ?? false,
-      createdAt: m.created_at,
-    }));
+    return (data as RawRow[] || []).map((m) => {
+      const profile = m.profiles as RawRow | null;
+      return {
+        id: m.id as string,
+        queryId: m.query_id as string,
+        senderId: m.sender_id as string,
+        senderName: (profile?.full_name as string | null) ?? null,
+        senderRole: (profile?.role as string | null) ?? 'customer',
+        content: m.content as string,
+        isInternal: (m.is_internal as boolean | null) ?? false,
+        createdAt: m.created_at as string,
+      };
+    });
   } catch {
     return [];
   }
@@ -144,7 +151,8 @@ export async function sendTicketMessage(
       return { success: false, error: 'Unauthorized' };
     }
 
-    const { data, error } = await (supabase as any)
+    const admin = createAdminClient();
+    const { data, error } = await admin
       .from('query_messages')
       .insert({
         query_id: queryId,
@@ -157,28 +165,69 @@ export async function sendTicketMessage(
 
     if (error || !data) return { success: false, error: error?.message ?? 'Failed to send' };
 
-    // Update query updated_at
-    await (supabase as any)
-      .from('queries')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', queryId);
+    // Update SLA timestamps + updated_at (only non-internal messages count for SLA)
+    const now = new Date().toISOString();
+    if (!isInternal) {
+      const { data: ticketSla } = await admin
+        .from('queries')
+        .select('first_admin_response_at')
+        .eq('id', queryId)
+        .maybeSingle();
 
-    const d = data as any;
+      await admin.from('queries').update({
+        updated_at: now,
+        last_admin_reply_at: now,
+        ...(ticketSla && !ticketSla.first_admin_response_at ? { first_admin_response_at: now } : {}),
+      }).eq('id', queryId);
+    } else {
+      await admin.from('queries').update({ updated_at: now }).eq('id', queryId);
+    }
+
+    const d = data as RawRow;
+    const senderProfile = d.profiles as RawRow | null;
+
+    // Email the customer about the admin reply (non-internal only, fire-and-forget)
+    if (!isInternal) {
+      void (async () => {
+        try {
+          const { data: ticket } = await admin
+            .from('queries')
+            .select(`subject, profiles!user_id (full_name, email)`)
+            .eq('id', queryId)
+            .maybeSingle();
+          if (ticket) {
+            const t = ticket as RawRow;
+            const customerProfile = t.profiles as RawRow | null;
+            const customerEmail = customerProfile?.email as string | null;
+            if (customerEmail) {
+              await sendAdminReplyCustomerEmail({
+                customerEmail,
+                customerName: (customerProfile?.full_name as string | null) || 'Customer',
+                subject: (t.subject as string | null) ?? '',
+                replyContent: content,
+                ticketId: queryId,
+              });
+            }
+          }
+        } catch { /* non-fatal */ }
+      })();
+    }
+
     return {
       success: true,
       message: {
-        id: d.id,
-        queryId: d.query_id,
-        senderId: d.sender_id,
-        senderName: d.profiles?.full_name ?? null,
-        senderRole: d.profiles?.role ?? 'administrator',
-        content: d.content,
-        isInternal: d.is_internal ?? false,
-        createdAt: d.created_at,
+        id: d.id as string,
+        queryId: d.query_id as string,
+        senderId: d.sender_id as string,
+        senderName: (senderProfile?.full_name as string | null) ?? null,
+        senderRole: (senderProfile?.role as string | null) ?? 'administrator',
+        content: d.content as string,
+        isInternal: (d.is_internal as boolean | null) ?? false,
+        createdAt: d.created_at as string,
       },
     };
-  } catch (err: any) {
-    return { success: false, error: err?.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
@@ -191,15 +240,16 @@ export async function updateTicketStatus(
     const { data: role } = await supabase.rpc('get_my_role');
     if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
 
-    const { error } = await (supabase as any)
+    const admin = createAdminClient();
+    const { error } = await admin
       .from('queries')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', queryId);
 
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
 
@@ -215,7 +265,7 @@ export async function deleteTicket(queryId: string): Promise<{ success: boolean;
     const { error } = await admin.from('queries').delete().eq('id', queryId);
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
   }
 }

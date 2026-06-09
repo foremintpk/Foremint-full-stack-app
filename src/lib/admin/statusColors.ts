@@ -9,13 +9,14 @@
  */
 
 export const STATUS_COLORS = {
-  pending:    '#f59e0b',
-  processing: '#3b82f6',
-  completed:  '#10b981',
-  formed:     '#10b981',
-  cancelled:  '#ef4444',
-  unpaid:     '#f59e0b',
-  paid:       '#10b981',
+  pending:            '#f59e0b',
+  initialized:        '#3b82f6',
+  submitted_in_state: '#8b5cf6',
+  ein_pending:        '#f97316',
+  formed:             '#10b981',
+  cancelled:          '#ef4444',
+  unpaid:             '#f59e0b',
+  paid:               '#10b981',
 } as const;
 
 export type StatusKey = keyof typeof STATUS_COLORS;

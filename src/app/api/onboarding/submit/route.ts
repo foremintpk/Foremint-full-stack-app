@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { buildPricingSnapshot } from '@/lib/pricing';
@@ -200,6 +201,11 @@ export async function POST(req: NextRequest) {
       console.error('Order creation failed:', orderError);
       return NextResponse.json({ error: 'Failed to create order: ' + orderError.message }, { status: 500 });
     }
+
+    // Bust the customer dashboard cache so the redirect to /dashboard shows the
+    // new order immediately rather than the 30-second stale cached payload.
+    revalidateTag(`customer-dashboard-${user.sub}`, 'max');
+    revalidateTag(`order-list-${user.sub}`, 'max');
 
     // Update draft status
     const { error: updateError } = await supabaseAdmin

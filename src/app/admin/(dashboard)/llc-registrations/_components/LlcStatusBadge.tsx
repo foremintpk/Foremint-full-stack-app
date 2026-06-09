@@ -20,11 +20,23 @@ const BADGE_STYLES: Record<LlcOrderStatus, StatusStyle> = {
     border: 'border-[#fde68a]',
     label: 'Pending',
   },
-  processing: {
+  initialized: {
     bg: 'bg-[#dbeafe]',
     text: 'text-[#1e40af]',
     border: 'border-[#bfdbfe]',
-    label: 'Processing',
+    label: 'Initialized',
+  },
+  submitted_in_state: {
+    bg: 'bg-[#ede9fe]',
+    text: 'text-[#5b21b6]',
+    border: 'border-[#ddd6fe]',
+    label: 'Submitted In State',
+  },
+  ein_pending: {
+    bg: 'bg-[#ffedd5]',
+    text: 'text-[#9a3412]',
+    border: 'border-[#fed7aa]',
+    label: 'EIN Pending',
   },
   formed: {
     bg: 'bg-[#d1fae5]',

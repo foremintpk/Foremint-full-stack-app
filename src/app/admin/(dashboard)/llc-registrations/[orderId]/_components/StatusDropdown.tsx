@@ -14,9 +14,11 @@ interface StatusDropdownProps {
 }
 
 const STATUS_OPTIONS: { value: OrderStatus; label: string; colorClass: string }[] = [
-  { value: 'pending',    label: 'Pending',    colorClass: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { value: 'processing', label: 'Processing', colorClass: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 'formed',     label: 'Formed',     colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { value: 'pending',            label: 'Pending',            colorClass: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { value: 'initialized',        label: 'Initialized',        colorClass: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { value: 'submitted_in_state', label: 'Submitted In State', colorClass: 'bg-violet-100 text-violet-800 border-violet-200' },
+  { value: 'ein_pending',        label: 'EIN Pending',        colorClass: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { value: 'formed',             label: 'Formed',             colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
 ];
 
 export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdownProps): React.JSX.Element {

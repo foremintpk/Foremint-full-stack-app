@@ -116,8 +116,8 @@ export interface DateRange {
 export interface LlcStats {
   total: number
   pending: number
-  processing: number
-  completed: number
+  inProgress: number
+  formed: number
 }
 
 export interface PaypalStats {
@@ -155,7 +155,7 @@ export interface OverviewStats {
 
 // ─── LLC Registrations List ───────────────────────────────────────────────────
 
-export type LlcOrderStatus = 'pending' | 'processing' | 'formed' | 'cancelled'
+export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'cancelled'
 export type PaymentStatus  = 'unpaid'  | 'paid'        | 'partial'
 export type SortDirection  = 'asc' | 'desc'
 export type LlcSortField   = 'created_at' | 'order_number' | 'grand_total'
@@ -178,7 +178,9 @@ export interface LlcOrderRow {
 export interface LlcTopStats {
   total: number
   pending: number
-  processing: number
+  initialized: number
+  submittedInState: number
+  einPending: number
   formed: number
 }
 
@@ -202,8 +204,8 @@ export interface LlcListResult {
 
 // ─── Order Detail ─────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'pending' | 'processing' | 'formed'
-// Note: 'cancelled' exists in DB but is not selectable from status dropdown UI
+export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed'
+// Note: 'cancelled' exists in DB but is not selectable from the status dropdown UI
 
 export interface OrderMember {
   index: number
@@ -559,6 +561,133 @@ export interface AddonFormData {
   featuresRaw: string          // newline-separated; converted to string[] before save
   status: AddonStatus
   categoryIds: string[]        // multi-select category IDs
+}
+
+// ─── Blog CMS ────────────────────────────────────────────────────────────────
+
+export type BlogStatus = 'draft' | 'published' | 'scheduled' | 'archived'
+export type BlogContentType = 'informational' | 'guide' | 'comparison' | 'transactional' | 'cost_analysis'
+
+export interface BlogCategory {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BlogTag {
+  id: string
+  name: string
+  slug: string
+  createdAt: string
+}
+
+export interface BlogFaq {
+  question: string
+  answer: string
+}
+
+export interface BlogPost {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  featuredImageUrl: string | null
+  featuredImageAlt: string | null
+  author: string
+  categoryId: string | null
+  categoryName: string | null
+  tags: BlogTag[]
+  status: BlogStatus
+  publishDate: string | null
+  publishedAt: string | null
+
+  // Content
+  content: string
+
+  // SEO
+  metaTitle: string | null
+  metaDescription: string | null
+  focusKeyword: string | null
+  secondaryKeywords: string[]
+  canonicalUrl: string | null
+  ogTitle: string | null
+  ogDescription: string | null
+  ogImage: string | null
+  twitterTitle: string | null
+  twitterDescription: string | null
+  twitterImage: string | null
+
+  // AEO
+  answerSummary: string | null
+  primaryEntity: string | null
+  relatedEntities: string[]
+  contentType: BlogContentType | null
+  keyTakeaways: string[]
+  faqs: BlogFaq[]
+
+  // Internal SEO
+  relatedArticleIds: string[]
+  relatedServicePages: string[]
+
+  // Auto-generated
+  readingTimeMinutes: number
+  wordCount: number
+  structuredData: Record<string, unknown> | null
+
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BlogListFilters {
+  q?: string
+  status?: BlogStatus | 'all'
+  categoryId?: string | 'all'
+  page?: number
+  pageSize?: number
+}
+
+export interface BlogListResult {
+  posts: BlogPost[]
+  total: number
+  totalPages: number
+}
+
+// Public API (headless CMS) — safe subset exposed to the frontend
+export interface PublicBlogPost {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  featuredImageUrl: string | null
+  featuredImageAlt: string | null
+  author: string
+  categoryName: string | null
+  categorySlug: string | null
+  tags: Array<{ name: string; slug: string }>
+  publishedAt: string
+  readingTimeMinutes: number
+  wordCount: number
+  content: string
+  metaTitle: string | null
+  metaDescription: string | null
+  focusKeyword: string | null
+  canonicalUrl: string | null
+  ogTitle: string | null
+  ogDescription: string | null
+  ogImage: string | null
+  twitterTitle: string | null
+  twitterDescription: string | null
+  twitterImage: string | null
+  answerSummary: string | null
+  primaryEntity: string | null
+  keyTakeaways: string[]
+  faqs: BlogFaq[]
+  structuredData: Record<string, unknown> | null
 }
 
 // ─── Expenses System (Chunk 4H) ──────────────────────────────────────────────

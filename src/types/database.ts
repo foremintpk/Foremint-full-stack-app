@@ -131,6 +131,32 @@ export type Database = {
           },
         ]
       }
+      admin_presence: {
+        Row: {
+          admin_id: string
+          is_online: boolean
+          last_seen_at: string
+        }
+        Insert: {
+          admin_id: string
+          is_online?: boolean
+          last_seen_at?: string
+        }
+        Update: {
+          admin_id?: string
+          is_online?: boolean
+          last_seen_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_presence_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -196,6 +222,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "b2b_order_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "b2b_order_assignments_b2b_user_id_fkey"
             columns: ["b2b_user_id"]
             isOneToOne: false
@@ -210,6 +243,274 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      billing_entries: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          order_id: string
+          title: string
+          type: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id: string
+          title: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          order_id?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_entries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_entries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      blog_post_tags: {
+        Row: {
+          post_id: string
+          tag_id: string
+        }
+        Insert: {
+          post_id: string
+          tag_id: string
+        }
+        Update: {
+          post_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_post_tags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_post_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "blog_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_posts: {
+        Row: {
+          answer_summary: string | null
+          author: string
+          canonical_url: string | null
+          category_id: string | null
+          content: string
+          content_type: Database["public"]["Enums"]["blog_content_type"] | null
+          created_at: string
+          created_by: string | null
+          excerpt: string
+          faqs: Json | null
+          featured_image_alt: string | null
+          featured_image_url: string | null
+          focus_keyword: string | null
+          id: string
+          key_takeaways: string[] | null
+          meta_description: string | null
+          meta_title: string | null
+          og_description: string | null
+          og_image: string | null
+          og_title: string | null
+          primary_entity: string | null
+          publish_date: string | null
+          published_at: string | null
+          reading_time_minutes: number | null
+          related_article_ids: string[] | null
+          related_entities: string[] | null
+          related_service_pages: string[] | null
+          secondary_keywords: string[] | null
+          slug: string
+          status: Database["public"]["Enums"]["blog_status"]
+          structured_data: Json | null
+          title: string
+          twitter_description: string | null
+          twitter_image: string | null
+          twitter_title: string | null
+          updated_at: string
+          updated_by: string | null
+          word_count: number | null
+        }
+        Insert: {
+          answer_summary?: string | null
+          author: string
+          canonical_url?: string | null
+          category_id?: string | null
+          content?: string
+          content_type?: Database["public"]["Enums"]["blog_content_type"] | null
+          created_at?: string
+          created_by?: string | null
+          excerpt: string
+          faqs?: Json | null
+          featured_image_alt?: string | null
+          featured_image_url?: string | null
+          focus_keyword?: string | null
+          id?: string
+          key_takeaways?: string[] | null
+          meta_description?: string | null
+          meta_title?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          primary_entity?: string | null
+          publish_date?: string | null
+          published_at?: string | null
+          reading_time_minutes?: number | null
+          related_article_ids?: string[] | null
+          related_entities?: string[] | null
+          related_service_pages?: string[] | null
+          secondary_keywords?: string[] | null
+          slug: string
+          status?: Database["public"]["Enums"]["blog_status"]
+          structured_data?: Json | null
+          title: string
+          twitter_description?: string | null
+          twitter_image?: string | null
+          twitter_title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          word_count?: number | null
+        }
+        Update: {
+          answer_summary?: string | null
+          author?: string
+          canonical_url?: string | null
+          category_id?: string | null
+          content?: string
+          content_type?: Database["public"]["Enums"]["blog_content_type"] | null
+          created_at?: string
+          created_by?: string | null
+          excerpt?: string
+          faqs?: Json | null
+          featured_image_alt?: string | null
+          featured_image_url?: string | null
+          focus_keyword?: string | null
+          id?: string
+          key_takeaways?: string[] | null
+          meta_description?: string | null
+          meta_title?: string | null
+          og_description?: string | null
+          og_image?: string | null
+          og_title?: string | null
+          primary_entity?: string | null
+          publish_date?: string | null
+          published_at?: string | null
+          reading_time_minutes?: number | null
+          related_article_ids?: string[] | null
+          related_entities?: string[] | null
+          related_service_pages?: string[] | null
+          secondary_keywords?: string[] | null
+          slug?: string
+          status?: Database["public"]["Enums"]["blog_status"]
+          structured_data?: Json | null
+          title?: string
+          twitter_description?: string | null
+          twitter_image?: string | null
+          twitter_title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blog_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "blog_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blog_posts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      blog_tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
       }
       companies: {
         Row: {
@@ -288,6 +589,97 @@ export type Database = {
           },
         ]
       }
+      coupon_usages: {
+        Row: {
+          coupon_id: string
+          discount_amount: number
+          id: string
+          order_id: string | null
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          coupon_id: string
+          discount_amount?: number
+          id?: string
+          order_id?: string | null
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          coupon_id?: string
+          discount_amount?: number
+          id?: string
+          order_id?: string | null
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_usages_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_usages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_usages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          id: string
+          name: string
+          per_user_uses: number
+          status: string
+          total_uses: number
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_type: string
+          discount_value?: number
+          id?: string
+          name: string
+          per_user_uses?: number
+          status?: string
+          total_uses?: number
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          name?: string
+          per_user_uses?: number
+          status?: string
+          total_uses?: number
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       document_resubmission_requests: {
         Row: {
           field_name: string
@@ -341,6 +733,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          cloudinary_resource_type: string | null
           document_type: string
           file_name: string
           file_size: number | null
@@ -360,6 +753,7 @@ export type Database = {
           verified_by: string | null
         }
         Insert: {
+          cloudinary_resource_type?: string | null
           document_type: string
           file_name: string
           file_size?: number | null
@@ -379,6 +773,7 @@ export type Database = {
           verified_by?: string | null
         }
         Update: {
+          cloudinary_resource_type?: string | null
           document_type?: string
           file_name?: string
           file_size?: number | null
@@ -717,6 +1112,66 @@ export type Database = {
           },
         ]
       }
+      order_client_notifications: {
+        Row: {
+          body: string | null
+          category: string
+          created_at: string
+          created_by: string | null
+          email_body: string | null
+          email_subject: string | null
+          expires_at: string | null
+          id: string
+          order_id: string
+          send_email: boolean
+          status: string
+          title: string
+        }
+        Insert: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          email_body?: string | null
+          email_subject?: string | null
+          expires_at?: string | null
+          id?: string
+          order_id: string
+          send_email?: boolean
+          status?: string
+          title: string
+        }
+        Update: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          email_body?: string | null
+          email_subject?: string | null
+          expires_at?: string | null
+          id?: string
+          order_id?: string
+          send_email?: boolean
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_client_notifications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_client_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_internal_addons: {
         Row: {
           addon_id: string
@@ -858,6 +1313,7 @@ export type Database = {
           payment_method: string | null
           payment_receipt_url: string | null
           payment_status: string
+          pending_amount_usd: number | null
           pricing_snapshot: Json
           search_vector: unknown
           second_payment_amount: number | null
@@ -903,6 +1359,7 @@ export type Database = {
           payment_method?: string | null
           payment_receipt_url?: string | null
           payment_status?: string
+          pending_amount_usd?: number | null
           pricing_snapshot?: Json
           search_vector?: unknown
           second_payment_amount?: number | null
@@ -948,6 +1405,7 @@ export type Database = {
           payment_method?: string | null
           payment_receipt_url?: string | null
           payment_status?: string
+          pending_amount_usd?: number | null
           pricing_snapshot?: Json
           search_vector?: unknown
           second_payment_amount?: number | null
@@ -990,97 +1448,6 @@ export type Database = {
           },
           {
             foreignKeyName: "orders_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      coupons: {
-        Row: {
-          code: string
-          created_at: string
-          discount_type: string
-          discount_value: number
-          id: string
-          name: string
-          per_user_uses: number
-          status: string
-          total_uses: number
-          updated_at: string
-          used_count: number
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          discount_type: string
-          discount_value: number
-          id?: string
-          name: string
-          per_user_uses: number
-          status?: string
-          total_uses: number
-          updated_at?: string
-          used_count?: number
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          discount_type?: string
-          discount_value?: number
-          id?: string
-          name?: string
-          per_user_uses?: number
-          status?: string
-          total_uses?: number
-          updated_at?: string
-          used_count?: number
-        }
-        Relationships: []
-      }
-      coupon_usages: {
-        Row: {
-          coupon_id: string
-          discount_amount: number
-          id: string
-          order_id: string | null
-          used_at: string
-          user_id: string
-        }
-        Insert: {
-          coupon_id: string
-          discount_amount: number
-          id?: string
-          order_id?: string | null
-          used_at?: string
-          user_id: string
-        }
-        Update: {
-          coupon_id?: string
-          discount_amount?: number
-          id?: string
-          order_id?: string | null
-          used_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "coupon_usages_coupon_id_fkey"
-            columns: ["coupon_id"]
-            isOneToOne: false
-            referencedRelation: "coupons"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "coupon_usages_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "coupon_usages_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -1269,33 +1636,64 @@ export type Database = {
       }
       queries: {
         Row: {
+          assigned_admin_id: string | null
+          assigned_at: string | null
           created_at: string
+          escalation_level: number
+          first_admin_response_at: string | null
           id: string
+          last_admin_reply_at: string | null
+          last_customer_reply_at: string | null
+          last_customer_viewed_at: string | null
           order_id: string | null
+          sla_breached_at: string | null
           status: Database["public"]["Enums"]["query_status"]
           subject: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          assigned_admin_id?: string | null
+          assigned_at?: string | null
           created_at?: string
+          escalation_level?: number
+          first_admin_response_at?: string | null
           id?: string
+          last_admin_reply_at?: string | null
+          last_customer_reply_at?: string | null
+          last_customer_viewed_at?: string | null
           order_id?: string | null
+          sla_breached_at?: string | null
           status?: Database["public"]["Enums"]["query_status"]
           subject: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          assigned_admin_id?: string | null
+          assigned_at?: string | null
           created_at?: string
+          escalation_level?: number
+          first_admin_response_at?: string | null
           id?: string
+          last_admin_reply_at?: string | null
+          last_customer_reply_at?: string | null
+          last_customer_viewed_at?: string | null
           order_id?: string | null
+          sla_breached_at?: string | null
           status?: Database["public"]["Enums"]["query_status"]
           subject?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "queries_assigned_admin_id_fkey"
+            columns: ["assigned_admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "queries_order_id_fkey"
             columns: ["order_id"]
@@ -1387,6 +1785,80 @@ export type Database = {
         }
         Relationships: []
       }
+      state_pricing: {
+        Row: {
+          annual_renewal_fee: number
+          business_address_fee: number
+          id: string
+          registered_agent_fee: number
+          registration_fee: number
+          renewal_date: string
+          state_code: string
+          state_name: string
+          total_annual_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          annual_renewal_fee?: number
+          business_address_fee?: number
+          id?: string
+          registered_agent_fee?: number
+          registration_fee?: number
+          renewal_date?: string
+          state_code: string
+          state_name: string
+          total_annual_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          annual_renewal_fee?: number
+          business_address_fee?: number
+          id?: string
+          registered_agent_fee?: number
+          registration_fee?: number
+          renewal_date?: string
+          state_code?: string
+          state_name?: string
+          total_annual_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ticket_escalations: {
+        Row: {
+          id: string
+          level: number
+          notified_admins: string[] | null
+          query_id: string
+          reason: string | null
+          triggered_at: string
+        }
+        Insert: {
+          id?: string
+          level: number
+          notified_admins?: string[] | null
+          query_id: string
+          reason?: string | null
+          triggered_at?: string
+        }
+        Update: {
+          id?: string
+          level?: number
+          notified_admins?: string[] | null
+          query_id?: string
+          reason?: string | null
+          triggered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_escalations_query_id_fkey"
+            columns: ["query_id"]
+            isOneToOne: false
+            referencedRelation: "queries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       admin_overview_stats: {
@@ -1394,24 +1866,30 @@ export type Database = {
           llc_completed: number | null
           llc_pending: number | null
           llc_processing: number | null
-          llc_revenue: number | null
           llc_total: number | null
-          paypal_completed: number | null
-          paypal_pending: number | null
-          paypal_processing: number | null
-          paypal_revenue: number | null
-          paypal_total: number | null
+          ra_completed: number | null
+          ra_pending: number | null
+          ra_processing: number | null
+          ra_total: number | null
         }
         Relationships: []
       }
     }
     Functions: {
+      check_email_exists: { Args: { email_to_check: string }; Returns: Json }
       get_my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
     }
     Enums: {
+      blog_content_type:
+        | "informational"
+        | "guide"
+        | "comparison"
+        | "transactional"
+        | "cost_analysis"
+      blog_status: "draft" | "published" | "scheduled" | "archived"
       company_structure:
         | "single_member_llc"
         | "multi_member_llc"
@@ -1436,13 +1914,11 @@ export type Database = {
         | "needs_revision"
       order_status:
         | "pending"
-        | "confirmed"
-        | "in_progress"
-        | "awaiting_documents"
-        | "awaiting_payment"
-        | "completed"
+        | "initialized"
+        | "submitted_in_state"
+        | "ein_pending"
+        | "formed"
         | "cancelled"
-        | "refunded"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
       user_role: "administrator" | "manager" | "customer" | "b2b_customer"
@@ -1573,6 +2049,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      blog_content_type: [
+        "informational",
+        "guide",
+        "comparison",
+        "transactional",
+        "cost_analysis",
+      ],
+      blog_status: ["draft", "published", "scheduled", "archived"],
       company_structure: [
         "single_member_llc",
         "multi_member_llc",
@@ -1600,13 +2084,11 @@ export const Constants = {
       ],
       order_status: [
         "pending",
-        "confirmed",
-        "in_progress",
-        "awaiting_documents",
-        "awaiting_payment",
-        "completed",
+        "initialized",
+        "submitted_in_state",
+        "ein_pending",
+        "formed",
         "cancelled",
-        "refunded",
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],
       storage_provider: ["supabase", "cloudinary"],

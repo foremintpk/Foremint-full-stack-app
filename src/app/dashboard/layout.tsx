@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession, isB2BRole, AccountDisabledError } from '@/lib/auth/get-session';
 import { createClient } from '@/lib/supabase/server';
 import { getCachedDashboardData, getCachedB2BDashboardData } from '@/lib/dashboard/getDashboardData';
+import { getCustomerBadgeCounts } from '@/lib/dashboard/getCustomerBadgeCounts';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 
 export const revalidate = 60; // Hold layout renders in Full Route Cache for max 60s
@@ -35,11 +36,14 @@ export default async function CustomerDashboardLayout({
     ? await getCachedB2BDashboardData(session.user.id, name, session.profile)
     : await getCachedDashboardData(session.user.id, name, session.profile);
 
-  const notificationsCount = data.notifications.filter(n => !n.isRead).length;
-  const actionsCount = data.actions.length;
   const initialLlcNames = Object.fromEntries(
     data.llcs.map((llc) => [llc.id, llc.llcName])
   );
+
+  // getCustomerBadgeCounts() is uncached and hits the DB directly —
+  // this gives the shell accurate ticket/action/notification counts at
+  // initial render without relying on the 30-second unstable_cache layer.
+  const badgeCounts = await getCustomerBadgeCounts();
 
   return (
     <DashboardShell
@@ -47,10 +51,7 @@ export default async function CustomerDashboardLayout({
       initialNotifications={data.notifications}
       initialLlcNames={initialLlcNames}
       isB2B={isB2B}
-      badgeCounts={{
-        notifications: notificationsCount,
-        actions: actionsCount,
-      }}
+      badgeCounts={badgeCounts}
     >
       {children}
     </DashboardShell>

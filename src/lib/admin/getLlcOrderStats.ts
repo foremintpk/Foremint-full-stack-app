@@ -42,21 +42,21 @@ async function fetchLlcOrderStats(
   const orders = data || [];
   const total = orders.length;
   let pending = 0;
-  let processing = 0;
+  let initialized = 0;
+  let submittedInState = 0;
+  let einPending = 0;
   let formed = 0;
 
   orders.forEach((o) => {
     const s = o.status;
-    if (s === 'pending') {
-      pending++;
-    } else if (s === 'in_progress') {
-      processing++;
-    } else if (s === 'completed' || s === 'confirmed') {
-      formed++;
-    }
+    if (s === 'pending') pending++;
+    else if (s === 'initialized') initialized++;
+    else if (s === 'submitted_in_state') submittedInState++;
+    else if (s === 'ein_pending') einPending++;
+    else if (s === 'formed') formed++;
   });
 
-  return { total, pending, processing, formed };
+  return { total, pending, initialized, submittedInState, einPending, formed };
 }
 
 export async function getCachedLlcOrderStats(

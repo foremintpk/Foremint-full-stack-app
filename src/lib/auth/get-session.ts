@@ -1,6 +1,5 @@
 import { cache } from 'react';
 import { createClient } from "@/lib/supabase/server";
-import { time } from "@/lib/perf";
 import type { User } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import type { Route } from "next";
@@ -31,7 +30,7 @@ const getSessionImpl = async (): Promise<AuthSession> => {
   const {
     data: claimsData,
     error: userError,
-  } = await time("getSession:auth.getClaims()", () => supabase.auth.getClaims());
+  } = await supabase.auth.getClaims();
   const claims = claimsData?.claims;
   // claims.sub is the user-id-equivalent claim (no `.id` field on JwtPayload) —
   // map it to `.id` so the returned `user` matches the existing `User`-shaped
@@ -42,15 +41,11 @@ const getSessionImpl = async (): Promise<AuthSession> => {
     throw new Error("Unauthenticated");
   }
 
-  const { data: profile, error: profileError } = await time(
-    "getSession:profile query",
-    () =>
-      supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single()
-  );
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
   if (profileError || !profile) {
     throw new Error("Profile not found");

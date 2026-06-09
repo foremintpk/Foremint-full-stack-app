@@ -26,14 +26,6 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
           placeholder="Jane Smith"
         />
 
-        <InputField
-          label="SSN / EIN"
-          value={member.ssnItin}
-          onChange={v => onChange({ ssnItin: v })}
-          placeholder="Optional"
-          type="password"
-        />
-
         {showPosition && (
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-gray-800">Position</label>

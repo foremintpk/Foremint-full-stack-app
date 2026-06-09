@@ -36,8 +36,7 @@ export async function GET() {
     const notifications = await fetchCustomerNotifications(
       supabase,
       user.sub,
-      isB2BRole(profile.role),
-      'notifications-route:query'
+      isB2BRole(profile.role)
     );
 
     const unreadNotifications = notifications.filter((n) => !n.isRead);

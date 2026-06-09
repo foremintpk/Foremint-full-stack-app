@@ -8,6 +8,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateTag, revalidatePath } from 'next/cache';
 
 export async function updateOrderStatus(
@@ -25,8 +26,10 @@ export async function updateOrderStatus(
       return { success: false, error: 'Unauthorized: Admin role required' };
     }
 
+    const adminSdk = createAdminClient();
+
     // 1. Fetch current order status to record the history change
-    const { data: order, error: orderError } = await (supabase as any)
+    const { data: order, error: orderError } = await adminSdk
       .from('orders')
       .select('status')
       .eq('id', orderId)
@@ -36,20 +39,13 @@ export async function updateOrderStatus(
       return { success: false, error: 'Order not found' };
     }
 
-    const oldStatus = order.status;
-
-    // Map UI-friendly aliases to actual DB enum values
-    const STATUS_ALIAS_MAP: Record<string, string> = {
-      processing: 'in_progress',
-      formed:     'completed',
-    };
-    const dbStatus = STATUS_ALIAS_MAP[newStatus] ?? newStatus;
+    const oldStatus = (order as Record<string, unknown>).status as string;
 
     // 2. Perform the order status update
-    const { error: updateError } = await (supabase as any)
+    const { error: updateError } = await adminSdk
       .from('orders')
       .update({
-        status: dbStatus,
+        status: newStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);
@@ -59,14 +55,14 @@ export async function updateOrderStatus(
     }
 
     // 3. Insert history audit log row
-    const { error: historyError } = await (supabase as any)
+    const { error: historyError } = await adminSdk
       .from('order_status_history')
       .insert({
         order_id: orderId,
         changed_by: adminId,
         old_status: oldStatus,
-        new_status: dbStatus,
-        note: note || `Status updated to ${dbStatus} by admin.`,
+        new_status: newStatus,
+        note: note || `Status updated to ${newStatus} by admin.`,
         changed_at: new Date().toISOString(),
       });
 
@@ -82,8 +78,8 @@ export async function updateOrderStatus(
     revalidatePath(`/admin/llc-registrations/${orderId}`, 'layout');
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'An unexpected error occurred' };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : 'An unexpected error occurred' };
   }
 }
 

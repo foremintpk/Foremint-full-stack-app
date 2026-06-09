@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
-import { time } from "@/lib/perf";
 import type { Database } from "@/types/database";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
-const PUBLIC_ROUTES = [
-  "/",
-  "/about",
-  "/services",
-  "/blog",
-  "/contact",
-  "/privacy",
-  "/terms",
-];
+// No public marketing routes — the marketing website is at foremint.com (separate deployment).
+// The root "/" redirects to /onboarding via src/app/page.tsx.
+const PUBLIC_ROUTES: string[] = [];
 
 const AUTHENTICATED_ROUTES = [
   "/company",
@@ -76,7 +69,7 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
     error,
-  } = await time("proxy:auth.getUser()", () => supabase.auth.getUser());
+  } = await supabase.auth.getUser();
 
   const authError = error as { code?: string; message?: string } | null;
   if (
@@ -105,11 +98,11 @@ export async function proxy(request: NextRequest) {
       return null;
     }
 
-    const { data: profile } = await time("proxy:role query", () => (supabase
+    const { data: profile } = await (supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
-      .maybeSingle() as unknown as Promise<{ data: { role: UserRole } | null }>));
+      .maybeSingle() as unknown as Promise<{ data: { role: UserRole } | null }>);
     return profile?.role || null;
   };
 

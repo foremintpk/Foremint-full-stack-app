@@ -2,7 +2,6 @@ import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { time } from '@/lib/perf';
 import { formatLlcName } from '../admin/formatters';
 import { computeBillingState } from './billing-utils';
 import { fetchCustomerNotifications } from './customerNotifications';
@@ -46,33 +45,33 @@ async function fetchDashboardDataQuery(
 
   const profilePromise: Promise<any> = prefetchedProfile
     ? Promise.resolve(prefetchedProfile)
-    : time<any>('dashboard:profile query', () => supabase
+    : supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
-      ).then((r: any) => r.data);
+        .then((r: any) => r.data);
 
   const ordersPromise: Promise<any[]> = scope?.assignedOrderIds
     ? (async () => {
         // B2B mode: assigned orders belong to other users, so read via adminSdk.
         if (scope.assignedOrderIds!.length === 0) return [];
-        const { data: ordersData, error: ordersError } = await time<any>('dashboard:orders query', () => adminSdk
+        const { data: ordersData, error: ordersError } = await adminSdk
           .from('orders')
           .select('*')
           .in('id', scope.assignedOrderIds!)
           .ilike('order_type', '%llc%')
-          .order('created_at', { ascending: false }));
+          .order('created_at', { ascending: false });
         if (ordersError) console.error('[fetchDashboardDataQuery B2B ordersError]:', ordersError);
         return ordersData || [];
       })()
     : (async () => {
-        const { data: ordersData, error: ordersError } = await time<any>('dashboard:orders query', () => supabase
+        const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select('*')
           .eq('user_id', userId)
           .ilike('order_type', '%llc%')
-          .order('created_at', { ascending: false }));
+          .order('created_at', { ascending: false });
         if (ordersError) console.error('[fetchDashboardDataQuery ordersError]:', ordersError);
         return ordersData || [];
       })();
@@ -80,12 +79,12 @@ async function fetchDashboardDataQuery(
   const notificationsPromise = fetchCustomerNotifications(supabase, userId, isB2B);
 
   const manualInvoicesPromise: Promise<any[]> = (!isB2B && fullName)
-    ? time<any>('dashboard:invoices query', () => supabase
+    ? supabase
         .from('invoices')
         .select('*')
         .ilike('name', `%${fullName}%`)
         .order('date', { ascending: false })
-      ).then((r: any) => r.data || [])
+        .then((r: any) => r.data || [])
     : Promise.resolve([]);
 
   const [profileRow, orders, notificationsData, manualInvoices] = await Promise.all([
@@ -106,35 +105,35 @@ async function fetchDashboardDataQuery(
   // each other, so they also run concurrently once `orders` is known. ──
   const [companiesRows, entriesRows, receiptDocRows, resubmitRows] = await Promise.all([
     companyIds.length > 0
-      ? time<any>('dashboard:companies query', () => adminSdk
+      ? adminSdk
           .from('companies')
           .select('id, company_name, state_renewal_date, state_renewal_fees, formation_date, ein')
           .in('id', companyIds)
-        ).then((r: any) => r.data || [])
+          .then((r: any) => r.data || [])
       : Promise.resolve([]),
     orderIdList.length > 0
-      ? time<any>('dashboard:billing query', () => adminSdk
+      ? adminSdk
           .from('billing_entries')
           .select('order_id, amount, type')
           .in('order_id', orderIdList)
-        ).then((r: any) => r.data || [])
+          .then((r: any) => r.data || [])
       : Promise.resolve([]),
     orderIdList.length > 0
-      ? time<any>('dashboard:receipts query', () => adminSdk
+      ? adminSdk
           .from('documents')
           .select('id, order_id')
           .in('order_id', orderIdList)
           .eq('slot_key', 'payment_receipt')
           .is('superseded_at', null)
-        ).then((r: any) => r.data || [])
+          .then((r: any) => r.data || [])
       : Promise.resolve([]),
     (!isB2B && orderIdList.length > 0)
-      ? time<any>('dashboard:resubmissions query', () => supabase
+      ? supabase
           .from('document_resubmission_requests')
           .select('*')
           .in('order_id', orderIdList)
           .eq('status', 'pending')
-        ).then((r: any) => r.data || [])
+          .then((r: any) => r.data || [])
       : Promise.resolve([]),
   ]);
 
@@ -158,7 +157,7 @@ async function fetchDashboardDataQuery(
     const company = companyId ? companiesMap[companyId] : null;
 
     let complianceState: CustomerLlcItem['complianceState'] = 'unknown';
-    if (o.status === 'completed' || o.status === 'confirmed') {
+    if (o.status === 'formed') {
       complianceState = 'compliant';
       if (company?.state_renewal_date) {
         const renewalDate = new Date(company.state_renewal_date);
@@ -169,8 +168,6 @@ async function fetchDashboardDataQuery(
           complianceState = 'renewal_due';
         }
       }
-    } else if (o.status === 'awaiting_documents') {
-      complianceState = 'action_required';
     }
 
     const formSnapshot = o.form_snapshot || {};
@@ -305,7 +302,7 @@ async function fetchDashboardDataQuery(
   });
 
   const totalLlcs = llcs.length;
-  const activeLlcs = llcs.filter((l) => l.status === 'completed' || l.status === 'confirmed').length;
+  const activeLlcs = llcs.filter((l) => l.status === 'formed').length;
   const pendingActions = actions.filter((a) => a.priority === 'high').length;
   const pendingPayments = llcs.filter((l) => l.paymentStatus !== 'paid').length;
 

@@ -18,26 +18,32 @@ interface StatCardProps {
 
 const DOT_COLORS: Record<string, string> = {
   pending:    '#f59e0b',
+  inProgress: '#3b82f6',
+  formed:     '#10b981',
   processing: '#3b82f6',
   completed:  '#10b981',
 };
 
 const BG_COLORS: Record<string, string> = {
   pending:    'bg-amber-50  border-amber-100',
+  inProgress: 'bg-blue-50   border-blue-100',
+  formed:     'bg-emerald-50 border-emerald-100',
   processing: 'bg-blue-50   border-blue-100',
   completed:  'bg-emerald-50 border-emerald-100',
 };
 
 const TEXT_COLORS: Record<string, string> = {
   pending:    'text-amber-700',
+  inProgress: 'text-blue-700',
+  formed:     'text-emerald-700',
   processing: 'text-blue-700',
   completed:  'text-emerald-700',
 };
 
 export function StatCard({ title, icon, iconBg, iconColor, total, stats }: StatCardProps) {
   const pending    = stats.find((s) => s.statusKey === 'pending')?.value    ?? 0;
-  const processing = stats.find((s) => s.statusKey === 'processing')?.value ?? 0;
-  const completed  = stats.find((s) => s.statusKey === 'completed')?.value  ?? 0;
+  const processing = stats.find((s) => s.statusKey === 'inProgress' || s.statusKey === 'processing')?.value ?? 0;
+  const completed  = stats.find((s) => s.statusKey === 'formed' || s.statusKey === 'completed')?.value ?? 0;
 
   return (
     <article

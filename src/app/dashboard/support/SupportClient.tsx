@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect, useMemo } from 'react';
+import { useState, useTransition, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { createSupportQuery, sendSupportMessage } from '@/lib/dashboard/actions';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useRealtime } from '@/components/realtime/RealtimeProvider';
+import { createSupportQuery, sendSupportMessage, markTicketViewed } from '@/lib/dashboard/actions';
 import {
-  MessageSquare, Plus, Send, Loader2, Clock, CheckCircle2,
-  AlertCircle, XCircle, ChevronRight, ArrowLeft, User, Headphones
+  MessageSquare, Plus, Send, Loader2,
+  AlertCircle, ArrowLeft, Headphones
 } from 'lucide-react';
 
 function StatusBadge({ status }: { status: string }) {
@@ -36,6 +37,15 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString();
 }
 
+interface SupportMessage {
+  id: string;
+  query_id?: string;
+  sender_id: string;
+  content: string;
+  is_internal?: boolean;
+  created_at: string;
+}
+
 interface SupportQuery {
   id: string;
   subject: string;
@@ -43,8 +53,8 @@ interface SupportQuery {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
-  lastMessage: any;
-  messages: any[];
+  lastMessage: SupportMessage | null;
+  messages: SupportMessage[];
 }
 
 interface Props {
@@ -242,16 +252,25 @@ function ConversationThread({ query, userId }: { query: SupportQuery; userId: st
   const [newMsg, setNewMsg] = useState('');
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<any[]>(query.messages || []);
+  const [messages, setMessages] = useState<SupportMessage[]>(query.messages || []);
   const [liveStatus, setLiveStatus] = useState(query.status);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<RealtimeChannel | null>(null);
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
+  const supabase = useRealtime();
 
   // Re-seed when switching tickets or after a server refresh
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => { setMessages(query.messages || []); }, [query.id, query.messages]);
   useEffect(() => { setLiveStatus(query.status); }, [query.id, query.status]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Mark this ticket as viewed when it opens — updates last_customer_viewed_at,
+  // which fires the customer-ticket-updates subscription in DashboardShell and
+  // decrements the badge count without any prop drilling.
+  useEffect(() => {
+    markTicketViewed(query.id).catch(() => {});
+  }, [query.id]);
 
   // Live updates via Broadcast — RLS-independent, guaranteed bidirectional delivery.
   // Both customer and admin join `ticket-${id}` and broadcast after a successful DB write.
@@ -321,7 +340,7 @@ function ConversationThread({ query, userId }: { query: SupportQuery; userId: st
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[400px]">
-        {messages.map((msg: any) => {
+        {messages.map((msg) => {
           const isMine = msg.sender_id === userId;
           return (
             <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>

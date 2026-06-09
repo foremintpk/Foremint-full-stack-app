@@ -7,6 +7,7 @@ import { revalidateTag as nextRevalidateTag } from 'next/cache';
 const revalidateTag = nextRevalidateTag as any;
 import { getSession } from '@/lib/auth/get-session';
 import { sendAdminReceiptUploadedEmail } from '@/lib/email/sendOrderConfirmation';
+import { sendNewTicketAdminEmail } from '@/lib/email/sendTicketEmails';
 import type { UpdateEmailResult, UpdatePasswordResult } from '@/types/admin';
 
 // Helper stateless verify client (no SSR cookies written)
@@ -530,29 +531,54 @@ export async function createSupportQuery(
       return { success: false, error: 'Failed to create ticket: ' + queryErr.message };
     }
 
-    // 2. Insert message
+    // 2. Insert message + set initial SLA timestamps
+    const now = new Date().toISOString();
     const { error: msgErr } = await supabase.from('query_messages').insert({
       query_id: query.id,
       sender_id: userId,
       content: message.trim(),
       is_internal: false,
-      created_at: new Date().toISOString(),
+      created_at: now,
     });
 
     if (msgErr) {
       return { success: false, error: 'Failed to post message: ' + msgErr.message };
     }
 
-    // 3. Notify administrator
+    // Track initial customer reply timestamp for SLA
+    await supabase.from('queries').update({ last_customer_reply_at: now }).eq('id', query.id);
+
+    // 3. Notify administrator in-app
     const clientName = session.profile.full_name || session.profile.email;
     await supabase.from('notifications').insert({
       type: 'new_support_ticket',
       target_role: 'administrator',
       title: 'New Support Ticket',
       body: `Customer ${clientName} created support ticket: "${subject}"`,
-      link: `/admin/queries`, // assuming admin queries route
+      link: `/admin/queries`,
       is_read: false,
     });
+
+    // 4. Email all active admins (fire-and-forget, dynamic recipient list)
+    void (async () => {
+      try {
+        const adminSdk = createAdminClient();
+        const { data: admins } = await adminSdk
+          .from('profiles')
+          .select('email')
+          .in('role', ['administrator', 'manager'])
+          .eq('is_active', true);
+        const adminEmails = (admins || []).map((a) => a.email as string).filter(Boolean);
+        await sendNewTicketAdminEmail({
+          adminEmails,
+          customerName: session.profile.full_name || 'Customer',
+          customerEmail: session.profile.email || '',
+          ticketId: query.id,
+          subject: subject.trim(),
+          firstMessage: message.trim(),
+        });
+      } catch { /* non-fatal */ }
+    })();
 
     revalidateTag(`customer-dashboard-${userId}`, 'max');
     return { success: true, queryId: query.id };
@@ -599,12 +625,14 @@ export async function sendSupportMessage(
       return { success: false, error: msgErr.message };
     }
 
-    // 2. Update query updated_at timestamp
+    // 2. Update SLA timestamps + reopen if resolved/closed
+    const now = new Date().toISOString();
     await supabase
       .from('queries')
       .update({
-        status: 'open', // Reopen query if resolved/closed and customer responds
-        updated_at: new Date().toISOString(),
+        status: 'open',
+        updated_at: now,
+        last_customer_reply_at: now,
       })
       .eq('id', queryId);
 
@@ -623,5 +651,50 @@ export async function sendSupportMessage(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Unexpected exception' };
+  }
+}
+
+// ─── Mark Ticket Viewed ───────────────────────────────────────────────────────
+// Called when a customer opens a conversation thread. Updates last_customer_viewed_at
+// which fires the customer-ticket-updates postgres_changes subscription in DashboardShell,
+// causing getCustomerBadgeCounts() to run and the badge count to decrease.
+//
+// Uses last_customer_viewed_at (not last_customer_reply_at) to avoid corrupting
+// admin's get_attention_ticket_count() — that RPC checks last_customer_reply_at >
+// last_admin_reply_at to flag tickets needing admin attention.
+export async function markTicketViewed(queryId: string): Promise<{ success: boolean }> {
+  try {
+    const session = await getSession();
+    const userId = session.user.id;
+    const supabase = await createClient();
+
+    const { data: ticket } = await supabase
+      .from('queries')
+      .select('id, last_admin_reply_at, last_customer_viewed_at')
+      .eq('id', queryId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    // No ticket, or admin hasn't replied yet — nothing to mark
+    if (!ticket || !ticket.last_admin_reply_at) return { success: true };
+
+    const adminReplied = new Date(ticket.last_admin_reply_at).getTime();
+    const lastViewed = ticket.last_customer_viewed_at
+      ? new Date(ticket.last_customer_viewed_at).getTime()
+      : 0;
+
+    // Already viewed after the latest admin reply — skip the update to avoid
+    // firing a spurious subscription event
+    if (lastViewed >= adminReplied) return { success: true };
+
+    await supabase
+      .from('queries')
+      .update({ last_customer_viewed_at: new Date().toISOString() })
+      .eq('id', queryId)
+      .eq('user_id', userId);
+
+    return { success: true };
+  } catch {
+    return { success: true }; // badge will reconcile on the 30s poll
   }
 }

@@ -61,12 +61,12 @@ async function fetchOverviewStats(
 
   // 1. LLC order counts
   const llcTotal = llcOrders.length;
-  let llcPending = 0, llcProcessing = 0, llcCompleted = 0;
+  let llcPending = 0, llcInProgress = 0, llcFormed = 0;
   llcOrders.forEach((o) => {
     const s = o.status as string;
     if (s === 'pending') llcPending++;
-    else if (s === 'in_progress') llcProcessing++;
-    else if (s === 'completed') llcCompleted++;
+    else if (s === 'initialized' || s === 'submitted_in_state' || s === 'ein_pending') llcInProgress++;
+    else if (s === 'formed') llcFormed++;
   });
 
   // 2. PayPal order counts
@@ -151,7 +151,7 @@ async function fetchOverviewStats(
   );
 
   return {
-    llc: { total: llcTotal, pending: llcPending, processing: llcProcessing, completed: llcCompleted },
+    llc: { total: llcTotal, pending: llcPending, inProgress: llcInProgress, formed: llcFormed },
     paypal: { total: paypalTotal, pending: paypalPending, processing: paypalProcessing, completed: paypalCompleted },
     earnings: { llcRevenue, paypalRevenue, invoiceCommissions, totalEarnings, llcPercent, paypalPercent, invoicePercent },
     dailyTrend,

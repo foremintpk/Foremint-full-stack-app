@@ -12,6 +12,7 @@ import {
   getCustomerSessionBadgeCount,
 } from '@/lib/dashboard/notificationCache';
 import { markCustomerNotificationsRead } from '@/lib/dashboard/actions';
+import { playNotificationChime } from '@/lib/notificationSound';
 
 interface CustomerNotificationDropdownProps {
   userId: string;
@@ -47,6 +48,15 @@ export function CustomerNotificationDropdown({
   });
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Play chime when new notifications arrive (badge count increases after initial mount)
+  const prevBadgeRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevBadgeRef.current !== null && badgeCount > prevBadgeRef.current) {
+      playNotificationChime();
+    }
+    prevBadgeRef.current = badgeCount;
+  }, [badgeCount]);
 
   useEffect(() => {
     if (onBadgeCountChange) {

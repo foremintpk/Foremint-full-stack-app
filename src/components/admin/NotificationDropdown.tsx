@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/admin/actions/markNotificationsRead';
+import { playNotificationChime } from '@/lib/notificationSound';
 
 const POLL_INTERVAL_MS = 45_000; // poll every 45s in the background
 
@@ -50,6 +51,15 @@ export function NotificationDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fetchingRef = useRef(false);
 
+  // Play chime when new notifications arrive (badge count increases after initial mount)
+  const prevBadgeRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevBadgeRef.current !== null && badgeCount > prevBadgeRef.current) {
+      playNotificationChime();
+    }
+    prevBadgeRef.current = badgeCount;
+  }, [badgeCount]);
+
   // Sync badge count to sidebar and sessionStorage whenever it changes
   useEffect(() => {
     onBadgeCountChange?.(badgeCount);
@@ -82,6 +92,7 @@ export function NotificationDropdown({
   }, []);
 
   // Fetch once on mount to get the latest state
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void fetchNotifications(true);
   }, [fetchNotifications]);
@@ -92,6 +103,7 @@ export function NotificationDropdown({
       void fetchNotifications();
     }
   }, [isOpen, fetchNotifications]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Background polling — keeps the badge count current even when dropdown is closed
   useEffect(() => {
@@ -145,11 +157,13 @@ export function NotificationDropdown({
     setBadgeCount((prev) => Math.max(0, prev - 1));
 
     // Update sessionStorage cache to reflect removal
+    /* eslint-disable react-hooks/purity */
     setNotifCache({
       fetchedAt: Date.now(),
       count: Math.max(0, badgeCount - 1),
       items: notifications.filter((n) => n.id !== notif.id),
     });
+    /* eslint-enable react-hooks/purity */
 
     // Persist to DB — fire-and-forget, no need to await for UI
     markNotificationRead(notif.id, adminId).catch((err) =>

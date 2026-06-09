@@ -30,10 +30,12 @@ export default function LlcListTopStats({
   };
 
   const pills = [
-    { label: 'All',        value: stats.total,      key: 'all'        as const },
-    { label: 'Pending',    value: stats.pending,    key: 'pending'    as const },
-    { label: 'Processing', value: stats.processing, key: 'processing' as const },
-    { label: 'Formed',     value: stats.formed,     key: 'formed'     as const },
+    { label: 'All',                value: stats.total,            key: 'all'                as const },
+    { label: 'Pending',            value: stats.pending,          key: 'pending'            as const },
+    { label: 'Initialized',        value: stats.initialized,      key: 'initialized'        as const },
+    { label: 'Submitted In State', value: stats.submittedInState, key: 'submitted_in_state' as const },
+    { label: 'EIN Pending',        value: stats.einPending,       key: 'ein_pending'        as const },
+    { label: 'Formed',             value: stats.formed,           key: 'formed'             as const },
   ];
 
   return (

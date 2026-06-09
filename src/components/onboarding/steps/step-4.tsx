@@ -50,12 +50,7 @@ export default function Step4() {
       return;
     }
 
-    const membersToSave = (formData.members ?? []).map((member: OnboardingMember) => ({
-      ...member,
-      ssnItin: member.ssnItin ?? '',
-    }));
-
-    saveStepData(4, { members: membersToSave });
+    saveStepData(4, { members: formData.members ?? [] });
     goToNextStep();
   };
 

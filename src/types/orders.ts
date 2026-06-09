@@ -1,12 +1,10 @@
 export type OrderStatus =
   | 'pending'
-  | 'confirmed'
-  | 'in_progress'
-  | 'awaiting_documents'
-  | 'awaiting_payment'
-  | 'completed'
-  | 'cancelled'
-  | 'refunded';
+  | 'initialized'
+  | 'submitted_in_state'
+  | 'ein_pending'
+  | 'formed'
+  | 'cancelled';
 
 export type PaymentStatus = 'unpaid' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'bank_transfer' | 'already_paid' | 'card' | 'none';

@@ -48,7 +48,7 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
  let status: LlcOrderStatus | 'all' = 'all';
  if (
  resolvedParams.status &&
- ['pending', 'processing', 'formed', 'cancelled'].includes(resolvedParams.status)
+ ['pending', 'initialized', 'submitted_in_state', 'ein_pending', 'formed', 'cancelled'].includes(resolvedParams.status)
  ) {
  status = resolvedParams.status as LlcOrderStatus;
  }
