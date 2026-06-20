@@ -14,6 +14,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
+import { AdminScrollLock } from './AdminScrollLock';
 import { LlcNameProvider } from '@/context/llc-name-context';
 import { AdminBadgeContext } from '@/context/admin-badge-context';
 import { RealtimeProvider, useRealtime } from '@/components/realtime/RealtimeProvider';
@@ -142,11 +143,12 @@ function AdminShellInner({
   return (
     <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>
       <LlcNameProvider initialNames={initialLlcNames}>
-        <div className="flex h-screen w-screen overflow-hidden bg-gray-50 font-inter">
+        <AdminScrollLock />
+        <div className="flex h-screen w-full overflow-hidden bg-gray-50 font-inter">
           <div className="relative flex-shrink-0 overflow-visible">
             <AdminSidebar badgeCounts={liveBadges} />
           </div>
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
             <AdminHeader
               adminProfile={adminProfile}
               initialNotifications={initialNotifications}

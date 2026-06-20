@@ -5,10 +5,15 @@
 
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { corsHeaders, corsPreflight } from '@/lib/blog/cors';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
+
+export async function GET(request: Request) {
   try {
     const adminSdk = createAdminClient();
     const { data, error } = await (adminSdk as any)
@@ -16,18 +21,13 @@ export async function GET() {
       .select('id, name, slug')
       .order('name');
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders(request) });
 
     return NextResponse.json(
       { tags: data ?? [] },
-      {
-        headers: {
-          'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
+      { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' }) }
     );
   } catch {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: corsHeaders(request) });
   }
 }

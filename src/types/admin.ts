@@ -573,8 +573,20 @@ export interface BlogCategory {
   name: string
   slug: string
   description: string | null
+  color: string | null
+  sortOrder: number
+  isActive: boolean
+  deletedAt: string | null
+  postCount?: number
   createdAt: string
   updatedAt: string
+}
+
+/** A single auto-generated table-of-contents entry extracted from H2/H3 headings. */
+export interface BlogTocEntry {
+  id: string
+  title: string
+  level: 2 | 3
 }
 
 export interface BlogTag {
@@ -601,11 +613,17 @@ export interface BlogPost {
   categoryName: string | null
   tags: BlogTag[]
   status: BlogStatus
+  isFeatured: boolean
   publishDate: string | null
   publishedAt: string | null
+  publishedBy: string | null
 
-  // Content
+  // Content — content_json is the editor source of truth, content_html is rendered
+  // output, content is a legacy plaintext fallback kept for backward compatibility.
   content: string
+  contentJson: Record<string, unknown> | null
+  contentHtml: string | null
+  toc: BlogTocEntry[]
 
   // SEO
   metaTitle: string | null
@@ -658,6 +676,20 @@ export interface BlogListResult {
 }
 
 // Public API (headless CMS) — safe subset exposed to the frontend
+/** Lightweight blog reference used for related-post lists. */
+export interface PublicBlogSummary {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  featuredImageUrl: string | null
+  featuredImageAlt: string | null
+  categoryName: string | null
+  categorySlug: string | null
+  readingTimeMinutes: number
+  publishedAt: string
+}
+
 export interface PublicBlogPost {
   id: string
   title: string
@@ -669,10 +701,17 @@ export interface PublicBlogPost {
   categoryName: string | null
   categorySlug: string | null
   tags: Array<{ name: string; slug: string }>
+  categoryColor: string | null
+  isFeatured: boolean
+  viewCount: number
   publishedAt: string
   readingTimeMinutes: number
   wordCount: number
   content: string
+  contentHtml: string | null
+  contentJson: Record<string, unknown> | null
+  toc: BlogTocEntry[]
+  relatedBlogs: PublicBlogSummary[]
   metaTitle: string | null
   metaDescription: string | null
   focusKeyword: string | null

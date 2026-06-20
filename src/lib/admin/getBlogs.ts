@@ -16,9 +16,14 @@ function mapRowToPost(row: Record<string, unknown>, tags: BlogTag[] = []): BlogP
     categoryName: (row as Record<string, unknown> & { blog_categories?: { name: string } | null }).blog_categories?.name ?? null,
     tags,
     status: row.status as BlogPost['status'],
+    isFeatured: (row.is_featured as boolean) ?? false,
     publishDate: (row.publish_date as string) ?? null,
     publishedAt: (row.published_at as string) ?? null,
+    publishedBy: (row.published_by as string) ?? null,
     content: (row.content as string) ?? '',
+    contentJson: (row.content_json as Record<string, unknown>) ?? null,
+    contentHtml: (row.content_html as string) ?? null,
+    toc: (row.toc as BlogPost['toc']) ?? [],
     metaTitle: (row.meta_title as string) ?? null,
     metaDescription: (row.meta_description as string) ?? null,
     focusKeyword: (row.focus_keyword as string) ?? null,
@@ -118,27 +123,64 @@ export const getCachedBlogPost = cache(async (id: string): Promise<BlogPost | nu
   )();
 });
 
+function mapRowToCategory(r: Record<string, unknown>, postCount?: number): BlogCategory {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    slug: r.slug as string,
+    description: (r.description as string) ?? null,
+    color: (r.color as string) ?? null,
+    sortOrder: (r.sort_order as number) ?? 0,
+    isActive: (r.is_active as boolean) ?? true,
+    deletedAt: (r.deleted_at as string) ?? null,
+    ...(postCount !== undefined ? { postCount } : {}),
+    createdAt: r.created_at as string,
+    updatedAt: r.updated_at as string,
+  };
+}
+
 async function fetchBlogCategories(): Promise<BlogCategory[]> {
   const adminSdk = createAdminClient();
   const { data, error } = await adminSdk
     .from('blog_categories')
     .select('*')
-    .order('name');
+    .is('deleted_at', null)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true });
   if (error) throw new Error(error.message);
-  return (data || []).map((r: Record<string, unknown>) => ({
-    id: r.id as string,
-    name: r.name as string,
-    slug: r.slug as string,
-    description: (r.description as string) ?? null,
-    createdAt: r.created_at as string,
-    updatedAt: r.updated_at as string,
-  }));
+  return (data || []).map((r: Record<string, unknown>) => mapRowToCategory(r));
 }
 
 export const getCachedBlogCategories = cache(async (): Promise<BlogCategory[]> => {
   return unstable_cache(
     async () => fetchBlogCategories(),
     ['blog-categories'],
+    { revalidate: 300, tags: ['blog-categories'] }
+  )();
+});
+
+/** Categories with their published-post counts — for the admin management page. */
+async function fetchBlogCategoriesWithCounts(): Promise<BlogCategory[]> {
+  const adminSdk = createAdminClient();
+  const [{ data: cats, error }, { data: posts }] = await Promise.all([
+    adminSdk.from('blog_categories').select('*').is('deleted_at', null)
+      .order('sort_order', { ascending: true }).order('name', { ascending: true }),
+    adminSdk.from('blog_posts').select('category_id'),
+  ]);
+  if (error) throw new Error(error.message);
+
+  const counts = new Map<string, number>();
+  for (const p of (posts || []) as Array<{ category_id: string | null }>) {
+    if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
+  }
+  return (cats || []).map((r: Record<string, unknown>) =>
+    mapRowToCategory(r, counts.get(r.id as string) ?? 0));
+}
+
+export const getCachedBlogCategoriesWithCounts = cache(async (): Promise<BlogCategory[]> => {
+  return unstable_cache(
+    async () => fetchBlogCategoriesWithCounts(),
+    ['blog-categories-counts'],
     { revalidate: 300, tags: ['blog-categories'] }
   )();
 });

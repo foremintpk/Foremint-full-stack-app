@@ -190,6 +190,52 @@ input:disabled,
    Ensures the login/auth pages never overflow.
    Applied via a class on <html> from auth layout.
    ============================================ */
+/* ============================================
+   Blog Rich Text Editor (Tiptap / ProseMirror)
+   Scoped styles so the admin editor shows real
+   formatting without the Tailwind typography plugin.
+   ============================================ */
+.ProseMirror { color: #1f2937; line-height: 1.7; overflow-wrap: break-word; word-break: break-word; }
+.ProseMirror:focus { outline: none; }
+/* Wide tables scroll inside the editor instead of widening the page */
+.ProseMirror .tableWrapper { overflow-x: auto; max-width: 100%; }
+.ProseMirror > * + * { margin-top: 0.75em; }
+.ProseMirror h1 { font-size: 1.875rem; font-weight: 800; line-height: 1.2; }
+.ProseMirror h2 { font-size: 1.5rem; font-weight: 700; line-height: 1.25; }
+.ProseMirror h3 { font-size: 1.25rem; font-weight: 700; }
+.ProseMirror h4 { font-size: 1.125rem; font-weight: 600; }
+.ProseMirror h5 { font-size: 1rem; font-weight: 600; }
+.ProseMirror h6 { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+.ProseMirror p { font-size: 0.95rem; }
+.ProseMirror ul { list-style: disc; padding-left: 1.5rem; }
+.ProseMirror ol { list-style: decimal; padding-left: 1.5rem; }
+.ProseMirror li > p { margin: 0; }
+.ProseMirror blockquote { border-left: 3px solid #34088f; padding-left: 1rem; color: #4b5563; font-style: italic; }
+.ProseMirror a { color: #34088f; text-decoration: underline; }
+.ProseMirror code { background: #f3f4f6; padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.85em; }
+.ProseMirror pre { background: #1e1b2e; color: #f8f8f2; padding: 0.9rem 1rem; border-radius: 8px; overflow-x: auto; }
+.ProseMirror pre code { background: transparent; color: inherit; padding: 0; }
+.ProseMirror hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
+.ProseMirror img { max-width: 100%; border-radius: 8px; }
+.ProseMirror .blog-figure { margin: 1rem 0; }
+.ProseMirror .blog-figure figcaption { font-size: 12px; color: #6b7280; margin-top: 6px; text-align: center; }
+.ProseMirror iframe { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; border: 0; }
+.ProseMirror table { border-collapse: collapse; width: 100%; margin: 1rem 0; overflow: hidden; }
+.ProseMirror th, .ProseMirror td { border: 1px solid #e5e7eb; padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; }
+.ProseMirror th { background: #faf8ff; font-weight: 600; }
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: "Write your article…"; color: #9ca3af; float: left; height: 0; pointer-events: none;
+}
+
+/* Admin dashboard is an app-shell: the shell fills the viewport and only the
+   <main> area scrolls. Lock html/body so no outer/body scrollbar can ever appear
+   (regardless of scrollbar width, dev overlays, or browser quirks). */
+html.admin-no-scroll,
+html.admin-no-scroll body {
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
 html.auth-no-scroll,
 html.auth-no-scroll body {
   overflow: hidden !important;

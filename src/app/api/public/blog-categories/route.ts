@@ -1,7 +1,6 @@
 /**
- * GET /api/public/categories
+ * GET /api/public/blog-categories
  * Returns all active blog categories with published-post counts.
- * Public — no auth required. (Alias of /api/public/blog-categories.)
  */
 
 import { NextResponse } from 'next/server';

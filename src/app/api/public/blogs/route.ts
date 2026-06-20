@@ -2,14 +2,23 @@
  * GET /api/public/blogs
  * Public headless CMS endpoint — returns published blog posts only.
  * No admin fields. No draft content. No internal metadata.
- * Consumed by the future foremint.com frontend.
+ * Consumed by the foremint.pk frontend.
+ *
+ * Query params: page, pageSize, category (slug), tag (slug), q (search),
+ *               featured (true|false), sort (newest|oldest|title|popular).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { PublicBlogPost } from '@/types/admin';
+import { PUBLIC_LIST_COLUMNS, mapPublicListRow } from '@/lib/blog/publicBlogs';
+import { corsHeaders, corsPreflight } from '@/lib/blog/cors';
 
 export const dynamic = 'force-dynamic';
+
+export function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +28,8 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const tag = searchParams.get('tag');
     const q = searchParams.get('q');
+    const featured = searchParams.get('featured');
+    const sort = searchParams.get('sort') ?? 'newest';
 
     const adminSdk = createAdminClient();
     const from = (page - 1) * pageSize;
@@ -26,77 +37,35 @@ export async function GET(request: NextRequest) {
 
     let query = (adminSdk as any)
       .from('blog_posts')
-      .select(`
-        id, title, slug, excerpt, featured_image_url, featured_image_alt,
-        author, category_id, published_at, reading_time_minutes, word_count,
-        meta_title, meta_description, focus_keyword, canonical_url,
-        og_title, og_description, og_image, twitter_title, twitter_description, twitter_image,
-        answer_summary, primary_entity, key_takeaways, faqs, structured_data,
-        blog_categories(name, slug),
-        blog_post_tags(blog_tags(name, slug))
-      `, { count: 'exact' })
+      .select(PUBLIC_LIST_COLUMNS, { count: 'exact' })
       .eq('status', 'published')
-      .lte('published_at', new Date().toISOString())
-      .order('published_at', { ascending: false })
-      .range(from, to);
+      .lte('published_at', new Date().toISOString());
 
     if (category) query = query.eq('blog_categories.slug', category);
-    if (q) query = query.ilike('title', `%${q}%`);
+    if (q) query = query.or(`title.ilike.%${q}%,excerpt.ilike.%${q}%`);
+    if (featured === 'true') query = query.eq('is_featured', true);
+
+    // Sorting
+    if (sort === 'oldest') query = query.order('published_at', { ascending: true });
+    else if (sort === 'title') query = query.order('title', { ascending: true });
+    else if (sort === 'popular') query = query.order('view_count', { ascending: false }).order('published_at', { ascending: false });
+    else query = query.order('published_at', { ascending: false });
+
+    query = query.range(from, to);
 
     const { data, error, count } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders(request) });
 
-    const posts: PublicBlogPost[] = (data || []).map((row: Record<string, unknown>) => {
-      const cats = row.blog_categories as { name: string; slug: string } | null;
-      const tagRows = (row.blog_post_tags as Array<{ blog_tags: { name: string; slug: string } }>) ?? [];
-      return {
-        id: row.id as string,
-        title: row.title as string,
-        slug: row.slug as string,
-        excerpt: row.excerpt as string,
-        featuredImageUrl: (row.featured_image_url as string) ?? null,
-        featuredImageAlt: (row.featured_image_alt as string) ?? null,
-        author: row.author as string,
-        categoryName: cats?.name ?? null,
-        categorySlug: cats?.slug ?? null,
-        tags: tagRows.map(t => ({ name: t.blog_tags.name, slug: t.blog_tags.slug })),
-        publishedAt: row.published_at as string,
-        readingTimeMinutes: (row.reading_time_minutes as number) ?? 1,
-        wordCount: (row.word_count as number) ?? 0,
-        content: '', // content omitted in listing — fetch individual post for full content
-        metaTitle: (row.meta_title as string) ?? null,
-        metaDescription: (row.meta_description as string) ?? null,
-        focusKeyword: (row.focus_keyword as string) ?? null,
-        canonicalUrl: (row.canonical_url as string) ?? null,
-        ogTitle: (row.og_title as string) ?? null,
-        ogDescription: (row.og_description as string) ?? null,
-        ogImage: (row.og_image as string) ?? null,
-        twitterTitle: (row.twitter_title as string) ?? null,
-        twitterDescription: (row.twitter_description as string) ?? null,
-        twitterImage: (row.twitter_image as string) ?? null,
-        answerSummary: (row.answer_summary as string) ?? null,
-        primaryEntity: (row.primary_entity as string) ?? null,
-        keyTakeaways: (row.key_takeaways as string[]) ?? [],
-        faqs: (row.faqs as PublicBlogPost['faqs']) ?? [],
-        structuredData: (row.structured_data as Record<string, unknown>) ?? null,
-      };
-    });
+    let posts = (data || []).map((row: Record<string, unknown>) => mapPublicListRow(row));
 
-    // Filter by tag in-memory (since Supabase M2M filter is complex)
-    const filtered = tag
-      ? posts.filter(p => p.tags.some(t => t.slug === tag))
-      : posts;
+    // Tag filter applied in-memory (Supabase M2M filtering is awkward via the SDK).
+    if (tag) posts = posts.filter((p: PublicBlogPost) => p.tags.some(t => t.slug === tag));
 
     return NextResponse.json(
-      { posts: filtered, total: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize) },
-      {
-        headers: {
-          'Cache-Control': 'public, max-age=60, stale-while-revalidate=120',
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
+      { posts, total: count ?? 0, page, pageSize, totalPages: Math.ceil((count ?? 0) / pageSize) },
+      { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' }) }
     );
-  } catch (err: unknown) {
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: corsHeaders(request) });
   }
 }

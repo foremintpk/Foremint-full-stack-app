@@ -74,6 +74,11 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'BookOpen',
   },
   {
+    label: 'Blog Categories',
+    href: '/admin/blog-categories',
+    icon: 'FolderTree',
+  },
+  {
     label: 'Settings',
     href: '/admin/settings',
     icon: 'Settings',

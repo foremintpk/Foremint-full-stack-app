@@ -1,24 +1,20 @@
 'use client';
 
-import { useState, useTransition, useCallback } from 'react';
+import { useState, useTransition, useCallback, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
-import { createBlogPost, updateBlogPost } from '@/lib/admin/actions/blogActions';
-import type { BlogPost, BlogCategory, BlogTag, BlogStatus, BlogContentType, BlogFaq } from '@/types/admin';
+import Image from 'next/image';
+import { Plus, Trash2, Loader2, UploadCloud, X, Star, ChevronDown } from 'lucide-react';
+import { toast } from 'sonner';
+import { createBlogPost, updateBlogPost, createBlogTag } from '@/lib/admin/actions/blogActions';
+import { RichTextEditor, type RichTextValue } from '@/components/editor/RichTextEditor';
+import { slugify } from '@/lib/blog/content';
+import type { BlogPost, BlogCategory, BlogTag, BlogStatus, BlogFaq } from '@/types/admin';
 
 interface BlogFormProps {
   post?: BlogPost;
   categories: BlogCategory[];
   allTags: BlogTag[];
 }
-
-const CONTENT_TYPES: Array<{ value: BlogContentType; label: string }> = [
-  { value: 'informational', label: 'Informational' },
-  { value: 'guide',         label: 'Guide' },
-  { value: 'comparison',    label: 'Comparison' },
-  { value: 'transactional', label: 'Transactional' },
-  { value: 'cost_analysis', label: 'Cost Analysis' },
-];
 
 const STATUSES: Array<{ value: BlogStatus; label: string }> = [
   { value: 'draft',     label: 'Draft' },
@@ -27,28 +23,40 @@ const STATUSES: Array<{ value: BlogStatus; label: string }> = [
   { value: 'archived',  label: 'Archived' },
 ];
 
-// ── Section accordion ─────────────────────────────────────────────────────────
+const inputClass = 'w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f] transition-all bg-white';
 
-function Section({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+// ── Card section (collapsible accordion) ────────────────────────────────────────
+
+function Card({
+  title,
+  description,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  description?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-[#e0d9f7] rounded-xl overflow-hidden">
+    <section className="w-full bg-white border border-[#e0d9f7] rounded-2xl shadow-sm overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className={`w-full flex items-center justify-between px-5 py-3.5 text-left transition-colors ${open ? 'bg-[#f4f0fe]' : 'bg-white hover:bg-gray-50/50'}`}
+        aria-expanded={open}
+        className={`w-full flex items-center justify-between gap-4 px-6 py-4 text-left transition-colors ${open ? 'bg-[#faf8ff] border-b border-[#f0ecfb]' : 'bg-white hover:bg-[#faf8ff]'}`}
       >
-        <span className="text-sm font-bold font-manrope text-gray-900">{title}</span>
-        {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+        <div>
+          <h2 className="text-sm font-bold font-manrope text-gray-900">{title}</h2>
+          {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        </div>
+        <ChevronDown className={`w-4 h-4 flex-shrink-0 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="p-5 bg-white border-t border-[#e0d9f7] space-y-4">{children}</div>}
-    </div>
+      {open && <div className="p-6 space-y-4">{children}</div>}
+    </section>
   );
 }
-
-// ── Field components ──────────────────────────────────────────────────────────
-
-const inputClass = 'w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f] transition-all bg-white';
 
 function Field({ label, required, children, hint }: { label: string; required?: boolean; children: React.ReactNode; hint?: string }) {
   return (
@@ -62,6 +70,64 @@ function Field({ label, required, children, hint }: { label: string; required?: 
   );
 }
 
+// ── Featured image uploader (Cloudinary) ──────────────────────────────────────
+
+function FeaturedImageUploader({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  const upload = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/admin/blogs/upload', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { toast.error(data.error ?? 'Upload failed'); return; }
+      onChange(data.url as string);
+      toast.success('Featured image uploaded');
+    } finally {
+      setUploading(false);
+    }
+  }, [onChange]);
+
+  if (value) {
+    return (
+      <div className="relative w-full max-w-md">
+        <Image src={value} alt="Featured" width={640} height={360} className="rounded-xl border border-gray-200 w-full h-auto object-cover" unoptimized />
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="absolute top-2 right-2 h-8 w-8 flex items-center justify-center rounded-full bg-white/90 text-gray-700 hover:bg-white shadow"
+          title="Remove image"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => inputRef.current?.click()}
+      disabled={uploading}
+      className="flex flex-col items-center justify-center gap-2 w-full max-w-md h-40 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-[#34088f]/40 hover:text-[#34088f] transition-colors disabled:opacity-50"
+    >
+      {uploading ? <Loader2 className="h-6 w-6 animate-spin" /> : <UploadCloud className="h-6 w-6" />}
+      <span className="text-xs font-semibold">{uploading ? 'Uploading…' : 'Upload featured image'}</span>
+      <span className="text-[10px]">Stored on Cloudinary · JPG/PNG/WebP · max 10MB</span>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ''; }}
+      />
+    </button>
+  );
+}
+
 // ── FAQ builder ───────────────────────────────────────────────────────────────
 
 function FaqBuilder({ faqs, onChange }: { faqs: BlogFaq[]; onChange: (faqs: BlogFaq[]) => void }) {
@@ -72,7 +138,6 @@ function FaqBuilder({ faqs, onChange }: { faqs: BlogFaq[]; onChange: (faqs: Blog
     updated[i] = { ...updated[i], [field]: val };
     onChange(updated);
   };
-
   return (
     <div className="space-y-3">
       {faqs.map((faq, i) => (
@@ -83,58 +148,87 @@ function FaqBuilder({ faqs, onChange }: { faqs: BlogFaq[]; onChange: (faqs: Blog
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
-          <input
-            type="text"
-            value={faq.question}
-            onChange={e => update(i, 'question', e.target.value)}
-            placeholder="Question"
-            className={inputClass}
-          />
-          <textarea
-            value={faq.answer}
-            onChange={e => update(i, 'answer', e.target.value)}
-            placeholder="Answer"
-            rows={3}
-            className={`${inputClass} resize-none`}
-          />
+          <input type="text" value={faq.question} onChange={e => update(i, 'question', e.target.value)} placeholder="Question" className={inputClass} />
+          <textarea value={faq.answer} onChange={e => update(i, 'answer', e.target.value)} placeholder="Answer" rows={3} className={`${inputClass} resize-none`} />
         </div>
       ))}
-      <button
-        type="button"
-        onClick={add}
-        className="flex items-center gap-1.5 text-xs font-semibold text-[#34088f] hover:text-[#2a0673] transition-colors"
-      >
-        <Plus className="w-3.5 h-3.5" />
-        Add FAQ
+      <button type="button" onClick={add} className="flex items-center gap-1.5 text-xs font-semibold text-[#34088f] hover:text-[#2a0673] transition-colors">
+        <Plus className="w-3.5 h-3.5" /> Add FAQ
       </button>
     </div>
   );
 }
 
-// ── Tag selector ──────────────────────────────────────────────────────────────
+// ── Tag selector (with inline creation) ─────────────────────────────────────────
 
-function TagSelector({ allTags, selectedIds, onChange }: { allTags: BlogTag[]; selectedIds: string[]; onChange: (ids: string[]) => void }) {
-  const toggle = (id: string) => {
-    onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+function TagSelector({
+  allTags,
+  selectedIds,
+  onChange,
+  onCreated,
+}: {
+  allTags: BlogTag[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  onCreated: (tag: BlogTag) => void;
+}) {
+  const [newTag, setNewTag] = useState('');
+  const [creating, setCreating] = useState(false);
+  const toggle = (id: string) => onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+
+  const handleCreate = async () => {
+    const name = newTag.trim();
+    if (!name || creating) return;
+    const existing = allTags.find(t => t.name.toLowerCase() === name.toLowerCase());
+    if (existing) {
+      if (!selectedIds.includes(existing.id)) toggle(existing.id);
+      setNewTag('');
+      return;
+    }
+    setCreating(true);
+    const result = await createBlogTag(name);
+    setCreating(false);
+    if (result.error || !result.id) { toast.error(result.error ?? 'Failed to create tag'); return; }
+    onCreated({ id: result.id, name, slug: slugify(name), createdAt: new Date().toISOString() });
+    setNewTag('');
+    toast.success(`Tag "${name}" created`);
   };
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {allTags.map(tag => (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {allTags.map(tag => (
+          <button
+            key={tag.id}
+            type="button"
+            onClick={() => toggle(tag.id)}
+            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${
+              selectedIds.includes(tag.id) ? 'bg-[#34088f] text-white border-[#34088f]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#34088f]/40'
+            }`}
+          >
+            {tag.name}
+          </button>
+        ))}
+        {allTags.length === 0 && <p className="text-xs text-gray-400">No tags yet — create one below.</p>}
+      </div>
+      <div className="flex items-center gap-2 max-w-sm">
+        <input
+          type="text"
+          value={newTag}
+          onChange={e => setNewTag(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleCreate(); } }}
+          placeholder="Create a new tag…"
+          className={inputClass}
+        />
         <button
-          key={tag.id}
           type="button"
-          onClick={() => toggle(tag.id)}
-          className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${
-            selectedIds.includes(tag.id)
-              ? 'bg-[#34088f] text-white border-[#34088f]'
-              : 'bg-white text-gray-600 border-gray-200 hover:border-[#34088f]/40'
-          }`}
+          onClick={() => void handleCreate()}
+          disabled={creating || !newTag.trim()}
+          className="flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-xl transition-colors disabled:opacity-50 whitespace-nowrap"
         >
-          {tag.name}
+          {creating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Add
         </button>
-      ))}
-      {allTags.length === 0 && <p className="text-xs text-gray-400">No tags available. Create tags from the blog list.</p>}
+      </div>
     </div>
   );
 }
@@ -145,213 +239,178 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const [title, setTitle] = useState(post?.title ?? '');
+  const [slug, setSlug] = useState(post?.slug ?? '');
+  const [slugTouched, setSlugTouched] = useState(!!post);
+  const [featuredImageUrl, setFeaturedImageUrl] = useState(post?.featuredImageUrl ?? '');
+  const [isFeatured, setIsFeatured] = useState(post?.isFeatured ?? false);
   const [faqs, setFaqs] = useState<BlogFaq[]>(post?.faqs ?? []);
+  const [availableTags, setAvailableTags] = useState<BlogTag[]>(allTags);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(post?.tags.map(t => t.id) ?? []);
-  const [keyTakeaways, setKeyTakeaways] = useState(post?.keyTakeaways.join('\n') ?? '');
-  const [relatedEntities, setRelatedEntities] = useState(post?.relatedEntities.join(', ') ?? '');
-  const [secondaryKeywords, setSecondaryKeywords] = useState(post?.secondaryKeywords.join(', ') ?? '');
+
+  const initialEditorContent = useMemo(
+    () => post?.contentJson ?? post?.contentHtml ?? post?.content ?? '',
+    [post]
+  );
+  const contentRef = useRef<RichTextValue>({
+    json: post?.contentJson ?? null,
+    html: post?.contentHtml ?? post?.content ?? '',
+  });
 
   const isEdit = !!post;
 
-  const handleSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError(null);
-    const formData = new FormData(e.currentTarget);
+  const onTitleChange = (v: string) => {
+    setTitle(v);
+    if (!slugTouched) setSlug(slugify(v));
+  };
 
-    // Inject dynamic state into formData
+  const handleSubmit = useCallback((statusOverride?: BlogStatus) => {
+    setError(null);
+    const form = document.getElementById('blog-form') as HTMLFormElement | null;
+    if (!form) return;
+    const formData = new FormData(form);
+
+    if (statusOverride) formData.set('status', statusOverride);
+    formData.set('contentHtml', contentRef.current.html);
+    formData.set('contentJson', JSON.stringify(contentRef.current.json ?? {}));
+    formData.set('featuredImageUrl', featuredImageUrl);
+    formData.set('isFeatured', isFeatured ? 'true' : 'false');
     formData.set('faqs', JSON.stringify(faqs));
-    formData.set('keyTakeaways', keyTakeaways);
-    formData.set('relatedEntities', relatedEntities);
-    formData.set('secondaryKeywords', secondaryKeywords);
     selectedTagIds.forEach(id => formData.append('tagIds', id));
 
     startTransition(async () => {
       const result = isEdit
         ? await updateBlogPost(post!.id, formData)
         : await createBlogPost(formData);
-
-      if (result.error) { setError(result.error); return; }
+      if (result.error) { setError(result.error); toast.error(result.error); return; }
+      toast.success(isEdit ? 'Post updated' : 'Post created');
       router.push('/admin/blogs');
       router.refresh();
     });
-  }, [faqs, keyTakeaways, relatedEntities, secondaryKeywords, selectedTagIds, isEdit, post, router]);
+  }, [featuredImageUrl, isFeatured, faqs, selectedTagIds, isEdit, post, router]);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form id="blog-form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-5 w-full min-w-0 max-w-full">
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
       )}
 
-      {/* ── Core Fields ── */}
-      <Section title="Core Information" defaultOpen>
+      {/* ── Section 1: Basic Information ── */}
+      <Card title="Basic Information" description="Core details shown in listings and search results.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Title" required>
-            <input name="title" defaultValue={post?.title} placeholder="Enter blog title" className={inputClass} required />
+            <input name="title" value={title} onChange={e => onTitleChange(e.target.value)} placeholder="Enter blog title" className={inputClass} required />
           </Field>
-          <Field label="Slug" hint="Auto-generated from title if left empty">
-            <input name="slug" defaultValue={post?.slug} placeholder="auto-generated-from-title" className={inputClass} />
+          <Field label="Slug" hint="Auto-generated from the title — edit to override.">
+            <input
+              name="slug"
+              value={slug}
+              onChange={e => { setSlug(e.target.value); setSlugTouched(true); }}
+              placeholder="auto-generated-from-title"
+              className={inputClass}
+            />
           </Field>
         </div>
 
-        <Field label="Excerpt" required hint="Short description shown in blog listings">
-          <textarea name="excerpt" defaultValue={post?.excerpt} placeholder="A compelling 1–2 sentence excerpt" rows={3} className={`${inputClass} resize-none`} required />
-        </Field>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Field label="Author" required>
-            <input name="author" defaultValue={post?.author} placeholder="Full name" className={inputClass} required />
-          </Field>
           <Field label="Category">
             <select name="categoryId" defaultValue={post?.categoryId ?? ''} className={inputClass}>
               <option value="">No category</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+          </Field>
+          <Field label="Author" required>
+            <input name="author" defaultValue={post?.author} placeholder="Full name" className={inputClass} required />
           </Field>
           <Field label="Status">
             <select name="status" defaultValue={post?.status ?? 'draft'} className={inputClass}>
               {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </Field>
-          <Field label="Publish Date" hint="Required for scheduled status">
-            <input name="publishDate" type="datetime-local" defaultValue={post?.publishDate?.replace('Z', '') ?? ''} className={inputClass} />
+          <Field label="Publish Date" hint="Required for scheduled posts.">
+            <input name="publishDate" type="datetime-local" defaultValue={post?.publishDate?.slice(0, 16) ?? ''} className={inputClass} />
           </Field>
         </div>
 
-        <Field label="Featured Image URL">
-          <input name="featuredImageUrl" defaultValue={post?.featuredImageUrl ?? ''} placeholder="https://..." className={inputClass} />
+        <Field label="Featured Image" hint="Uploaded directly to Cloudinary; only the URL is stored.">
+          <FeaturedImageUploader value={featuredImageUrl} onChange={setFeaturedImageUrl} />
         </Field>
         <Field label="Featured Image Alt Text">
           <input name="featuredImageAlt" defaultValue={post?.featuredImageAlt ?? ''} placeholder="Descriptive alt text" className={inputClass} />
         </Field>
 
         <Field label="Tags">
-          <TagSelector allTags={allTags} selectedIds={selectedTagIds} onChange={setSelectedTagIds} />
-        </Field>
-      </Section>
-
-      {/* ── Rich Content ── */}
-      <Section title="Content">
-        <Field label="Article Content" hint="Markdown or HTML supported">
-          <textarea
-            name="content"
-            defaultValue={post?.content}
-            placeholder="Write your article content here..."
-            rows={20}
-            className={`${inputClass} resize-y font-mono text-xs`}
+          <TagSelector
+            allTags={availableTags}
+            selectedIds={selectedTagIds}
+            onChange={setSelectedTagIds}
+            onCreated={(tag) => {
+              setAvailableTags(prev => [...prev, tag]);
+              setSelectedTagIds(prev => [...prev, tag.id]);
+            }}
           />
         </Field>
-      </Section>
 
-      {/* ── SEO Fields ── */}
-      <Section title="SEO Fields">
+        <label className="flex items-center gap-2 cursor-pointer w-fit">
+          <input type="checkbox" checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} className="sr-only peer" />
+          <span className={`h-5 w-5 rounded-md border flex items-center justify-center transition-colors ${isFeatured ? 'bg-[#34088f] border-[#34088f]' : 'border-gray-300 bg-white'}`}>
+            {isFeatured && <Star className="h-3 w-3 text-white fill-white" />}
+          </span>
+          <span className="text-xs font-bold text-gray-700">Feature this post</span>
+        </label>
+      </Card>
+
+      {/* ── Section 2: Content ── */}
+      <Card title="Content" description="Write with the rich editor — headings, images, tables, embeds and more.">
+        <RichTextEditor
+          initialContent={initialEditorContent}
+          onChange={(v) => { contentRef.current = v; }}
+        />
+        <Field label="Excerpt" hint="Leave blank to auto-generate from the first paragraph.">
+          <textarea name="excerpt" defaultValue={post?.excerpt} placeholder="Short summary shown in blog listings" rows={2} className={`${inputClass} resize-none`} />
+        </Field>
+      </Card>
+
+      {/* ── Section 3: SEO ── */}
+      <Card title="SEO" defaultOpen={false} description="Open Graph & Twitter metadata are generated automatically from these fields and the featured image.">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Meta Title" hint="Ideal length: 50–60 characters">
+          <Field label="Meta Title" hint="Defaults to “Title | ForeMint”.">
             <input name="metaTitle" defaultValue={post?.metaTitle ?? ''} placeholder="Page title for search engines" className={inputClass} />
           </Field>
-          <Field label="Focus Keyword" required>
+          <Field label="Focus Keyword">
             <input name="focusKeyword" defaultValue={post?.focusKeyword ?? ''} placeholder="Primary keyword phrase" className={inputClass} />
           </Field>
         </div>
-        <Field label="Meta Description" hint="Ideal length: 150–160 characters">
+        <Field label="Meta Description" hint="Leave blank to auto-generate (150–160 chars) from the first paragraph.">
           <textarea name="metaDescription" defaultValue={post?.metaDescription ?? ''} placeholder="Short description for search results" rows={3} className={`${inputClass} resize-none`} />
         </Field>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Secondary Keywords" hint="Comma-separated">
-            <input value={secondaryKeywords} onChange={e => setSecondaryKeywords(e.target.value)} placeholder="keyword1, keyword2, keyword3" className={inputClass} />
-          </Field>
-          <Field label="Canonical URL">
-            <input name="canonicalUrl" defaultValue={post?.canonicalUrl ?? ''} placeholder="https://app.foremint.com/blog/slug" className={inputClass} />
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-gray-100">
-          <Field label="OG Title">
-            <input name="ogTitle" defaultValue={post?.ogTitle ?? ''} placeholder="Open Graph title" className={inputClass} />
-          </Field>
-          <Field label="OG Description">
-            <input name="ogDescription" defaultValue={post?.ogDescription ?? ''} placeholder="Open Graph description" className={inputClass} />
-          </Field>
-          <Field label="OG Image URL">
-            <input name="ogImage" defaultValue={post?.ogImage ?? ''} placeholder="https://..." className={inputClass} />
-          </Field>
-          <Field label="Twitter Title">
-            <input name="twitterTitle" defaultValue={post?.twitterTitle ?? ''} placeholder="Twitter card title" className={inputClass} />
-          </Field>
-          <Field label="Twitter Description">
-            <input name="twitterDescription" defaultValue={post?.twitterDescription ?? ''} placeholder="Twitter card description" className={inputClass} />
-          </Field>
-          <Field label="Twitter Image URL">
-            <input name="twitterImage" defaultValue={post?.twitterImage ?? ''} placeholder="https://..." className={inputClass} />
-          </Field>
-        </div>
-      </Section>
-
-      {/* ── AEO Fields ── */}
-      <Section title="AEO Fields (Answer Engine Optimization)">
-        <Field label="Answer Summary" required hint="2–3 sentences that AI systems can extract directly">
-          <textarea name="answerSummary" defaultValue={post?.answerSummary ?? ''} placeholder="A Wyoming LLC can be formed online with state filing fees beginning at $100..." rows={3} className={`${inputClass} resize-none`} />
+        <Field label="Canonical URL">
+          <input name="canonicalUrl" defaultValue={post?.canonicalUrl ?? ''} placeholder="https://foremint.pk/blog/slug" className={inputClass} />
         </Field>
+      </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Primary Entity" required hint="The main subject, e.g. Wyoming LLC, Registered Agent, EIN">
-            <input name="primaryEntity" defaultValue={post?.primaryEntity ?? ''} placeholder="Wyoming LLC" className={inputClass} />
-          </Field>
-          <Field label="Related Entities" hint="Comma-separated, e.g. Registered Agent, EIN, Operating Agreement">
-            <input value={relatedEntities} onChange={e => setRelatedEntities(e.target.value)} placeholder="Registered Agent, EIN, Articles of Organization" className={inputClass} />
-          </Field>
-        </div>
-
-        <Field label="Content Type">
-          <select name="contentType" defaultValue={post?.contentType ?? ''} className={inputClass}>
-            <option value="">Select content type</option>
-            {CONTENT_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
-          </select>
+      {/* ── Section 4: AEO ── */}
+      <Card title="Answer Engine Optimization" defaultOpen={false} description="Helps AI assistants surface this content. Other AEO fields are generated automatically.">
+        <Field label="Answer Summary" hint="2–3 sentences an AI assistant can extract directly.">
+          <textarea name="answerSummary" defaultValue={post?.answerSummary ?? ''} placeholder="A Wyoming LLC can be formed online with state filing fees beginning at $100…" rows={3} className={`${inputClass} resize-none`} />
         </Field>
-
-        <Field label="Key Takeaways" hint="One takeaway per line">
-          <textarea value={keyTakeaways} onChange={e => setKeyTakeaways(e.target.value)} placeholder="Takeaway 1&#10;Takeaway 2&#10;Takeaway 3" rows={5} className={`${inputClass} resize-none`} />
-        </Field>
-
-        <Field label="FAQ Builder" hint="Add unlimited frequently asked questions">
+        <Field label="FAQ Builder" hint="Rendered as FAQ schema for rich results.">
           <FaqBuilder faqs={faqs} onChange={setFaqs} />
         </Field>
-      </Section>
+      </Card>
 
       {/* ── Submit actions ── */}
-      <div className="flex items-center justify-between pt-2">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
-        >
+      <div className="flex items-center justify-between pt-1">
+        <button type="button" onClick={() => router.back()} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
           Cancel
         </button>
         <div className="flex gap-3">
-          <button
-            type="submit"
-            name="status"
-            value="draft"
-            onClick={() => {
-              const statusEl = document.querySelector<HTMLSelectElement>('select[name="status"]');
-              if (statusEl) statusEl.value = 'draft';
-            }}
-            disabled={isPending}
-            className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:border-[#34088f]/40 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Save Draft
+          <button type="button" onClick={() => handleSubmit('draft')} disabled={isPending} className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:border-[#34088f]/40 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2">
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save Draft
           </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="px-5 py-2.5 text-sm font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-full transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {isEdit ? 'Update Post' : 'Save & Publish'}
+          <button type="submit" disabled={isPending} className="px-5 py-2.5 text-sm font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-full transition-colors disabled:opacity-50 flex items-center gap-2">
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {isEdit ? 'Update Post' : 'Save Post'}
           </button>
         </div>
       </div>
