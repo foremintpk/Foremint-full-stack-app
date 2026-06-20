@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { PublicBlogPost, PublicBlogSummary, BlogTocEntry } from '@/types/admin';
 import { corsHeaders, corsPreflight } from '@/lib/blog/cors';
+import { extractCategories } from '@/lib/blog/publicBlogs';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,8 @@ export async function GET(
         meta_title, meta_description, focus_keyword, canonical_url,
         og_title, og_description, og_image, twitter_title, twitter_description, twitter_image,
         answer_summary, primary_entity, key_takeaways, faqs, structured_data,
-        blog_categories(name, slug, color),
+        blog_categories!category_id(name, slug, color),
+        blog_post_categories(blog_categories(name, slug, color)),
         blog_post_tags(blog_tags(name, slug))
       `)
       .eq('slug', slug)
@@ -61,6 +63,7 @@ export async function GET(
       categoryName: cat?.name ?? null,
       categorySlug: cat?.slug ?? null,
       categoryColor: cat?.color ?? null,
+      categories: extractCategories(data as Record<string, unknown>),
       isFeatured: data.is_featured ?? false,
       viewCount: data.view_count ?? 0,
       tags: tagRows.map(t => ({ name: t.blog_tags.name, slug: t.blog_tags.slug })),
@@ -104,7 +107,7 @@ async function fetchRelated(
   categoryId: string | null,
 ): Promise<PublicBlogSummary[]> {
   const cols = `id, title, slug, excerpt, featured_image_url, featured_image_alt,
-                published_at, reading_time_minutes, blog_categories(name, slug)`;
+                published_at, reading_time_minutes, blog_categories!category_id(name, slug)`;
   const now = new Date().toISOString();
 
   const map = (rows: Array<Record<string, unknown>>): PublicBlogSummary[] =>

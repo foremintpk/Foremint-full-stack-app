@@ -133,7 +133,9 @@ function parseBlogFormData(formData: FormData) {
   const title = get('title');
   const slugRaw = get('slug');
   const author = get('author');
-  const categoryId = get('categoryId') || null;
+  // Multi-category: the first selected id is the primary (kept in blog_posts.category_id).
+  const categoryIds = formData.getAll('categoryIds').map(v => String(v)).filter(Boolean);
+  const categoryId = categoryIds[0] ?? null;
   const status = (formData.get('status') as BlogStatus | null) ?? 'draft';
   const publishDate = get('publishDate') || null;
 
@@ -166,7 +168,7 @@ function parseBlogFormData(formData: FormData) {
   const metaDescription = metaDescriptionRaw || (excerpt ? generateMetaDescription(contentHtml) || excerpt : null);
 
   return {
-    title, slugRaw, author, categoryId, status, publishDate,
+    title, slugRaw, author, categoryId, categoryIds, status, publishDate,
     contentHtml, contentJson, toc, plainText,
     excerpt, featuredImageUrl, featuredImageAlt, isFeatured,
     metaTitle, metaDescription, focusKeyword, canonicalUrl,
@@ -189,6 +191,20 @@ function validateBlog(parsed: ParsedBlog): string | null {
     return 'Invalid publish date';
   }
   return null;
+}
+
+/** Replace a post's category set in the many-to-many junction table. */
+async function syncPostCategories(
+  adminSdk: ReturnType<typeof createAdminClient>,
+  postId: string,
+  categoryIds: string[],
+): Promise<void> {
+  await (adminSdk as any).from('blog_post_categories').delete().eq('post_id', postId);
+  if (categoryIds.length > 0) {
+    await (adminSdk as any)
+      .from('blog_post_categories')
+      .insert(categoryIds.map((category_id) => ({ post_id: postId, category_id })));
+  }
 }
 
 async function resolveCategoryName(
@@ -230,7 +246,8 @@ export async function createBlogPost(formData: FormData): Promise<{ error?: stri
     const { name: categoryName, error: catError } = await resolveCategoryName(adminSdk, parsed.categoryId);
     if (catError) return { error: catError };
 
-    const baseSlug = parsed.slugRaw || slugify(parsed.title);
+    // Always slugify — never trust a raw slug field (could contain spaces / "?").
+    const baseSlug = slugify(parsed.slugRaw || parsed.title);
     const slug = await ensureUniqueSlug(adminSdk, 'blog_posts', baseSlug);
 
     const now = new Date().toISOString();
@@ -281,7 +298,10 @@ export async function createBlogPost(formData: FormData): Promise<{ error?: stri
         .insert(parsed.tagIds.map(tag_id => ({ post_id: post.id, tag_id })));
     }
 
+    await syncPostCategories(adminSdk, post.id, parsed.categoryIds);
+
     revalidateTag('blog-list', 'max');
+    revalidateTag('blog-categories', 'max');
     revalidatePath('/admin/blogs', 'layout');
     return { id: post.id };
   } catch (err: unknown) {
@@ -310,7 +330,8 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<{ 
     const { name: categoryName, error: catError } = await resolveCategoryName(adminSdk, parsed.categoryId);
     if (catError) return { error: catError };
 
-    const baseSlug = parsed.slugRaw || slugify(parsed.title);
+    // Always slugify — never trust a raw slug field (could contain spaces / "?").
+    const baseSlug = slugify(parsed.slugRaw || parsed.title);
     const slug = baseSlug !== existing.slug
       ? await ensureUniqueSlug(adminSdk, 'blog_posts', baseSlug, id)
       : existing.slug;
@@ -368,7 +389,10 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<{ 
         .insert(parsed.tagIds.map(tag_id => ({ post_id: id, tag_id })));
     }
 
+    await syncPostCategories(adminSdk, id, parsed.categoryIds);
+
     revalidateTag('blog-list', 'max');
+    revalidateTag('blog-categories', 'max');
     revalidateTag(`blog-post-${id}`, 'max');
     revalidatePath('/admin/blogs', 'layout');
     return {};
@@ -415,7 +439,7 @@ export async function createBlogCategory(formData: FormData): Promise<{ error?: 
     const parsed = parseCategoryFormData(formData);
     if (!parsed.name) return { error: 'Name is required' };
 
-    const baseSlug = parsed.slugRaw || slugify(parsed.name);
+    const baseSlug = slugify(parsed.slugRaw || parsed.name);
     const slug = await ensureUniqueSlug(adminSdk, 'blog_categories', baseSlug);
 
     const { data, error } = await (adminSdk as any)
@@ -451,7 +475,7 @@ export async function updateBlogCategory(id: string, formData: FormData): Promis
       .from('blog_categories').select('slug').eq('id', id).single();
     if (!existing) return { error: 'Category not found' };
 
-    const baseSlug = parsed.slugRaw || slugify(parsed.name);
+    const baseSlug = slugify(parsed.slugRaw || parsed.name);
     const slug = baseSlug !== existing.slug
       ? await ensureUniqueSlug(adminSdk, 'blog_categories', baseSlug, id)
       : existing.slug;

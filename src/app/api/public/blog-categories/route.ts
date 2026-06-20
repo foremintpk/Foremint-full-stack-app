@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const categories = await getPublicCategories();
     return NextResponse.json(
       { categories },
-      { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' }) }
+      { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' }) }
     );
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: corsHeaders(request) });

@@ -159,6 +159,47 @@ function FaqBuilder({ faqs, onChange }: { faqs: BlogFaq[]; onChange: (faqs: Blog
   );
 }
 
+// ── Category selector (multi-select) ────────────────────────────────────────────
+
+function CategorySelector({
+  categories,
+  selectedIds,
+  onChange,
+}: {
+  categories: BlogCategory[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const toggle = (id: string) =>
+    onChange(selectedIds.includes(id) ? selectedIds.filter(i => i !== id) : [...selectedIds, id]);
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {categories.map((cat) => {
+        const idx = selectedIds.indexOf(cat.id);
+        const selected = idx !== -1;
+        const isPrimary = idx === 0;
+        return (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => toggle(cat.id)}
+            className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all flex items-center gap-1.5 ${
+              selected ? 'bg-[#34088f] text-white border-[#34088f]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#34088f]/40'
+            }`}
+            title={isPrimary ? 'Primary category' : undefined}
+          >
+            {cat.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: selected ? '#fff' : cat.color }} />}
+            {cat.name}
+            {isPrimary && <span className="text-[9px] uppercase tracking-wide opacity-80">· primary</span>}
+          </button>
+        );
+      })}
+      {categories.length === 0 && <p className="text-xs text-gray-400">No categories yet. Create them on the Blog Categories page.</p>}
+    </div>
+  );
+}
+
 // ── Tag selector (with inline creation) ─────────────────────────────────────────
 
 function TagSelector({
@@ -248,6 +289,7 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
   const [faqs, setFaqs] = useState<BlogFaq[]>(post?.faqs ?? []);
   const [availableTags, setAvailableTags] = useState<BlogTag[]>(allTags);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(post?.tags.map(t => t.id) ?? []);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(post?.categoryIds ?? []);
 
   const initialEditorContent = useMemo(
     () => post?.contentJson ?? post?.contentHtml ?? post?.content ?? '',
@@ -278,6 +320,7 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
     formData.set('isFeatured', isFeatured ? 'true' : 'false');
     formData.set('faqs', JSON.stringify(faqs));
     selectedTagIds.forEach(id => formData.append('tagIds', id));
+    selectedCategoryIds.forEach(id => formData.append('categoryIds', id));
 
     startTransition(async () => {
       const result = isEdit
@@ -288,7 +331,7 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
       router.push('/admin/blogs');
       router.refresh();
     });
-  }, [featuredImageUrl, isFeatured, faqs, selectedTagIds, isEdit, post, router]);
+  }, [featuredImageUrl, isFeatured, faqs, selectedTagIds, selectedCategoryIds, isEdit, post, router]);
 
   return (
     <form id="blog-form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-5 w-full min-w-0 max-w-full">
@@ -313,13 +356,7 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
           </Field>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Field label="Category">
-            <select name="categoryId" defaultValue={post?.categoryId ?? ''} className={inputClass}>
-              <option value="">No category</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Author" required>
             <input name="author" defaultValue={post?.author} placeholder="Full name" className={inputClass} required />
           </Field>
@@ -332,6 +369,10 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
             <input name="publishDate" type="datetime-local" defaultValue={post?.publishDate?.slice(0, 16) ?? ''} className={inputClass} />
           </Field>
         </div>
+
+        <Field label="Categories" hint="Assign one or more. The first selected is the primary category. Manage categories on the Blog Categories page.">
+          <CategorySelector categories={categories} selectedIds={selectedCategoryIds} onChange={setSelectedCategoryIds} />
+        </Field>
 
         <Field label="Featured Image" hint="Uploaded directly to Cloudinary; only the URL is stored.">
           <FeaturedImageUploader value={featuredImageUrl} onChange={setFeaturedImageUrl} />

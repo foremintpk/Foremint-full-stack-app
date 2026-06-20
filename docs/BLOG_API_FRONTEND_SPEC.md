@@ -301,9 +301,10 @@ then newest, so the list is **never empty** on a fresh site.
 | `featuredImageUrl` | string | **yes** | Cloudinary absolute URL. Hero/card image. Show a gradient placeholder when `null` (the design’s purple `%` block). |
 | `featuredImageAlt` | string | yes | `alt` for the featured image. |
 | `author` | string | no | Plain author name (e.g. “Foremint Tax Desk”). **There is no author object/avatar/bio** — render initials avatar from the name. |
-| `categoryName` | string | yes | Category label / chip text. |
-| `categorySlug` | string | yes | Link to category page / filter value. |
-| `categoryColor` | string (hex) | yes | Category chip/accent color. |
+| `categoryName` | string | yes | **Primary** category label / chip text. |
+| `categorySlug` | string | yes | Primary category — link to category page / filter value. |
+| `categoryColor` | string (hex) | yes | Primary category chip/accent color. |
+| `categories` | `{name,slug,color}[]` | no (may be `[]`) | **All** categories a post belongs to (many-to-many). Render one chip per entry; the first is the primary. Present on list & single. |
 | `isFeatured` | boolean | no | Drives the “FEATURED” hero card and the “Essential” badge in Popular reads. |
 | `viewCount` | int | no | All-time view count (auto-tracked). Used for “Most read”/“Popular”. Present on list, single, trending. |
 | `tags` | `{name, slug}[]` | no (may be `[]`) | Tag chips; link via `?tag={slug}`. |
@@ -340,14 +341,14 @@ then newest, so the list is **never empty** on a fresh site.
 - **Slug**: auto-generated from the title, unique, editable in admin, returned by API, and is the **only** identifier used in public URLs. Use `/blog/{slug}`. Do **not** use `id` in URLs.
 - **Images**: absolute Cloudinary HTTPS URLs or `null`. Never prepend a base. Inline article images are already inside `contentHtml` as `<figure><img ...><figcaption>…</figcaption></figure>`.
 - **Content format**: stored/served as **HTML** (`contentHtml`, source: Tiptap). Render with `dangerouslySetInnerHTML`; style via your prose CSS. Heading IDs for the TOC are already injected.
-- **Relationships**: a post **belongs to one category** (`categoryName/Slug/Color`, may be null) and **has many tags** (`tags[]`). Author is a **string**, not a relation. Related posts come pre-computed in `relatedBlogs` on the single endpoint. There are **no** comments, no media gallery endpoint, no per-author endpoint.
+- **Relationships**: a post **belongs to one or more categories** — all in `categories[]`, with the primary mirrored in `categoryName/Slug/Color` (may be null) — and **has many tags** (`tags[]`). Author is a **string**, not a relation. Related posts come pre-computed in `relatedBlogs` on the single endpoint. There are **no** comments, no media gallery endpoint, no per-author endpoint.
 
 ---
 
 ## 9. Sorting / Filtering / Search / Auth — summary
 
 - **Sort** (`/blogs?sort=`): `newest` (default), `oldest`, `title`, `popular` (all-time views). Trending (recent-window) has its own endpoint — see §6b.
-- **Filter**: `category` (slug), `tag` (slug), `featured=true`. Status is implicit (always published only).
+- **Filter**: `category` (slug), `tag` (slug), `featured=true`. Status is implicit (always published only). A post can belong to **multiple** categories — `?category={slug}` matches any post that includes that category (via the many-to-many junction).
 - **Search**: `q=` matches `title` OR `excerpt` (case-insensitive). No full-text body search.
 - **Auth**: every public endpoint is open; no headers, no tokens, no roles.
 

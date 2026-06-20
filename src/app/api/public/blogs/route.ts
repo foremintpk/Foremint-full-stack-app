@@ -41,7 +41,27 @@ export async function GET(request: NextRequest) {
       .eq('status', 'published')
       .lte('published_at', new Date().toISOString());
 
-    if (category) query = query.eq('blog_categories.slug', category);
+    // Category filter (many-to-many): resolve the slug to its post ids via the junction.
+    if (category) {
+      const { data: catRow } = await (adminSdk as any)
+        .from('blog_categories').select('id').eq('slug', category).is('deleted_at', null).maybeSingle();
+      if (!catRow) {
+        return NextResponse.json(
+          { posts: [], total: 0, page, pageSize, totalPages: 0 },
+          { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' }) }
+        );
+      }
+      const { data: idRows } = await (adminSdk as any)
+        .from('blog_post_categories').select('post_id').eq('category_id', catRow.id);
+      const postIds = ((idRows ?? []) as Array<{ post_id: string }>).map(r => r.post_id);
+      if (postIds.length === 0) {
+        return NextResponse.json(
+          { posts: [], total: 0, page, pageSize, totalPages: 0 },
+          { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' }) }
+        );
+      }
+      query = query.in('id', postIds);
+    }
     if (q) query = query.or(`title.ilike.%${q}%,excerpt.ilike.%${q}%`);
     if (featured === 'true') query = query.eq('is_featured', true);
 

@@ -611,6 +611,7 @@ export interface BlogPost {
   author: string
   categoryId: string | null
   categoryName: string | null
+  categoryIds: string[]
   tags: BlogTag[]
   status: BlogStatus
   isFeatured: boolean
@@ -702,6 +703,7 @@ export interface PublicBlogPost {
   categorySlug: string | null
   tags: Array<{ name: string; slug: string }>
   categoryColor: string | null
+  categories: Array<{ name: string; slug: string; color: string | null }>
   isFeatured: boolean
   viewCount: number
   publishedAt: string

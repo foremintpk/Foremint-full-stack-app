@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Clock, Eye, Edit3 } from 'lucide-react';
+import { Clock, Eye, Edit3, ExternalLink } from 'lucide-react';
 import { BlogStatusBadge } from './BlogStatusBadge';
 import { BlogDeleteButton } from './BlogDeleteButton';
 import type { BlogPost } from '@/types/admin';
@@ -7,6 +7,9 @@ import type { BlogPost } from '@/types/admin';
 interface BlogTableProps {
   posts: BlogPost[];
 }
+
+// Public site base for "View on site". Override via NEXT_PUBLIC_FRONTEND_URL.
+const FRONTEND_BASE = (process.env.NEXT_PUBLIC_FRONTEND_URL ?? 'https://foremint.pk').replace(/\/$/, '');
 
 export function BlogTable({ posts }: BlogTableProps) {
   if (posts.length === 0) {
@@ -65,15 +68,26 @@ export function BlogTable({ posts }: BlogTableProps) {
                 <td className="px-5 py-4">
                   <div className="flex items-center justify-end gap-1">
                     {post.status === 'published' && (
-                      <a
-                        href={`/api/public/blogs/${post.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Preview (API)"
-                        className="p-1.5 rounded-full text-gray-400 hover:text-[#34088f] hover:bg-[#f4f0fe] transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </a>
+                      <>
+                        <a
+                          href={`${FRONTEND_BASE}/blog/${post.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View on site"
+                          className="p-1.5 rounded-full text-gray-400 hover:text-[#34088f] hover:bg-[#f4f0fe] transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                        <a
+                          href={`/api/public/blogs/${post.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View API (JSON)"
+                          className="p-1.5 rounded-full text-gray-400 hover:text-[#34088f] hover:bg-[#f4f0fe] transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </a>
+                      </>
                     )}
                     <Link
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any

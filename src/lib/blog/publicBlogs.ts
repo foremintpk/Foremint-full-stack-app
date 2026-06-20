@@ -12,13 +12,26 @@ export const PUBLIC_LIST_COLUMNS = `
   meta_title, meta_description, focus_keyword, canonical_url,
   og_title, og_description, og_image, twitter_title, twitter_description, twitter_image,
   answer_summary, primary_entity, key_takeaways, faqs, structured_data,
-  blog_categories(name, slug, color),
+  blog_categories!category_id(name, slug, color),
+  blog_post_categories(blog_categories(name, slug, color)),
   blog_post_tags(blog_tags(name, slug))
 `;
+
+type CatRef = { name: string; slug: string; color: string | null };
+
+/** Build the categories[] array from the junction, falling back to the primary. */
+export function extractCategories(row: Record<string, unknown>): CatRef[] {
+  const junction = (row.blog_post_categories as Array<{ blog_categories: CatRef | null }>) ?? [];
+  const list = junction.map(j => j.blog_categories).filter((c): c is CatRef => !!c);
+  if (list.length > 0) return list;
+  const primary = row.blog_categories as CatRef | null;
+  return primary ? [primary] : [];
+}
 
 export function mapPublicListRow(row: Record<string, unknown>): PublicBlogPost {
   const cat = row.blog_categories as { name: string; slug: string; color: string | null } | null;
   const tagRows = (row.blog_post_tags as Array<{ blog_tags: { name: string; slug: string } }>) ?? [];
+  const categories = extractCategories(row);
   return {
     id: row.id as string,
     title: row.title as string,
@@ -27,9 +40,10 @@ export function mapPublicListRow(row: Record<string, unknown>): PublicBlogPost {
     featuredImageUrl: (row.featured_image_url as string) ?? null,
     featuredImageAlt: (row.featured_image_alt as string) ?? null,
     author: row.author as string,
-    categoryName: cat?.name ?? null,
-    categorySlug: cat?.slug ?? null,
-    categoryColor: cat?.color ?? null,
+    categoryName: cat?.name ?? categories[0]?.name ?? null,
+    categorySlug: cat?.slug ?? categories[0]?.slug ?? null,
+    categoryColor: cat?.color ?? categories[0]?.color ?? null,
+    categories,
     isFeatured: (row.is_featured as boolean) ?? false,
     viewCount: (row.view_count as number) ?? 0,
     tags: tagRows.map(t => ({ name: t.blog_tags.name, slug: t.blog_tags.slug })),

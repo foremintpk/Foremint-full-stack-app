@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { BlogPost, BlogListFilters, BlogListResult, BlogCategory, BlogTag } from '@/types/admin';
 
-function mapRowToPost(row: Record<string, unknown>, tags: BlogTag[] = []): BlogPost {
+function mapRowToPost(row: Record<string, unknown>, tags: BlogTag[] = [], categoryIds: string[] = []): BlogPost {
   return {
     id: row.id as string,
     title: row.title as string,
@@ -14,6 +14,7 @@ function mapRowToPost(row: Record<string, unknown>, tags: BlogTag[] = []): BlogP
     author: row.author as string,
     categoryId: (row.category_id as string) ?? null,
     categoryName: (row as Record<string, unknown> & { blog_categories?: { name: string } | null }).blog_categories?.name ?? null,
+    categoryIds: categoryIds.length > 0 ? categoryIds : ((row.category_id as string) ? [row.category_id as string] : []),
     tags,
     status: row.status as BlogPost['status'],
     isFeatured: (row.is_featured as boolean) ?? false,
@@ -62,7 +63,7 @@ async function fetchBlogPosts(filters: BlogListFilters): Promise<BlogListResult>
 
   let query = adminSdk
     .from('blog_posts')
-    .select('*, blog_categories(name, slug)', { count: 'exact' })
+    .select('*, blog_categories!category_id(name, slug)', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(from, to);
 
@@ -97,7 +98,7 @@ async function fetchBlogPostById(id: string): Promise<BlogPost | null> {
   const adminSdk = createAdminClient();
   const { data, error } = await adminSdk
     .from('blog_posts')
-    .select('*, blog_categories(name, slug)')
+    .select('*, blog_categories!category_id(name, slug)')
     .eq('id', id)
     .single();
   if (error || !data) return null;
@@ -112,7 +113,16 @@ async function fetchBlogPostById(id: string): Promise<BlogPost | null> {
     .map((r: Record<string, unknown>) => (r as { blog_tags: BlogTag }).blog_tags)
     .filter(Boolean);
 
-  return mapRowToPost(data, tags);
+  // Fetch the post's categories (many-to-many junction)
+  const { data: catRows } = await adminSdk
+    .from('blog_post_categories')
+    .select('category_id')
+    .eq('post_id', id);
+  const categoryIds: string[] = (catRows || [])
+    .map((r: Record<string, unknown>) => r.category_id as string)
+    .filter(Boolean);
+
+  return mapRowToPost(data, tags, categoryIds);
 }
 
 export const getCachedBlogPost = cache(async (id: string): Promise<BlogPost | null> => {
@@ -162,16 +172,16 @@ export const getCachedBlogCategories = cache(async (): Promise<BlogCategory[]> =
 /** Categories with their published-post counts — for the admin management page. */
 async function fetchBlogCategoriesWithCounts(): Promise<BlogCategory[]> {
   const adminSdk = createAdminClient();
-  const [{ data: cats, error }, { data: posts }] = await Promise.all([
+  const [{ data: cats, error }, { data: junction }] = await Promise.all([
     adminSdk.from('blog_categories').select('*').is('deleted_at', null)
       .order('sort_order', { ascending: true }).order('name', { ascending: true }),
-    adminSdk.from('blog_posts').select('category_id'),
+    adminSdk.from('blog_post_categories').select('category_id'),
   ]);
   if (error) throw new Error(error.message);
 
   const counts = new Map<string, number>();
-  for (const p of (posts || []) as Array<{ category_id: string | null }>) {
-    if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
+  for (const r of (junction || []) as Array<{ category_id: string | null }>) {
+    if (r.category_id) counts.set(r.category_id, (counts.get(r.category_id) ?? 0) + 1);
   }
   return (cats || []).map((r: Record<string, unknown>) =>
     mapRowToCategory(r, counts.get(r.id as string) ?? 0));

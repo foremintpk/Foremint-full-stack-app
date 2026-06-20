@@ -43,12 +43,27 @@ export async function GET(
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
+    // Posts in this category (many-to-many via the junction).
+    const { data: idRows } = await (adminSdk as any)
+      .from('blog_post_categories').select('post_id').eq('category_id', category.id);
+    const postIds = ((idRows ?? []) as Array<{ post_id: string }>).map(r => r.post_id);
+
+    if (postIds.length === 0) {
+      return NextResponse.json(
+        {
+          category: { id: category.id, name: category.name, slug: category.slug, description: category.description ?? null, color: category.color ?? null, postCount: 0 },
+          posts: [], total: 0, page, pageSize, totalPages: 0,
+        },
+        { headers: corsHeaders(request, { 'Cache-Control': 'public, max-age=120, stale-while-revalidate=300' }) }
+      );
+    }
+
     const { data, count, error } = await (adminSdk as any)
       .from('blog_posts')
       .select(PUBLIC_LIST_COLUMNS, { count: 'exact' })
       .eq('status', 'published')
       .lte('published_at', new Date().toISOString())
-      .eq('category_id', category.id)
+      .in('id', postIds)
       .order('published_at', { ascending: false })
       .range(from, to);
 

@@ -19,7 +19,7 @@ export async function getPublicCategories(): Promise<PublicBlogCategory[]> {
   const adminSdk = createAdminClient();
   const now = new Date().toISOString();
 
-  const [{ data: cats }, { data: posts }] = await Promise.all([
+  const [{ data: cats }, { data: junction }] = await Promise.all([
     (adminSdk as any)
       .from('blog_categories')
       .select('id, name, slug, description, color, sort_order')
@@ -27,16 +27,17 @@ export async function getPublicCategories(): Promise<PublicBlogCategory[]> {
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .order('name', { ascending: true }),
+    // Count published posts per category through the many-to-many junction.
     (adminSdk as any)
-      .from('blog_posts')
-      .select('category_id')
-      .eq('status', 'published')
-      .lte('published_at', now),
+      .from('blog_post_categories')
+      .select('category_id, blog_posts!inner(status, published_at)')
+      .eq('blog_posts.status', 'published')
+      .lte('blog_posts.published_at', now),
   ]);
 
   const counts = new Map<string, number>();
-  for (const p of (posts ?? []) as Array<{ category_id: string | null }>) {
-    if (p.category_id) counts.set(p.category_id, (counts.get(p.category_id) ?? 0) + 1);
+  for (const r of (junction ?? []) as Array<{ category_id: string | null }>) {
+    if (r.category_id) counts.set(r.category_id, (counts.get(r.category_id) ?? 0) + 1);
   }
 
   return ((cats ?? []) as Array<Record<string, unknown>>).map((c) => ({
