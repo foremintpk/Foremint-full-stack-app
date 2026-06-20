@@ -10,20 +10,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import TextAlign from '@tiptap/extension-text-align';
-import Youtube from '@tiptap/extension-youtube';
-import { Table } from '@tiptap/extension-table';
-import { TableRow } from '@tiptap/extension-table-row';
-import { TableHeader } from '@tiptap/extension-table-header';
-import { TableCell } from '@tiptap/extension-table-cell';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code, Quote,
   List, ListOrdered, Minus, Link2, Image as ImageIcon, Film as YoutubeIcon,
-  Table as TableIcon, AlignLeft, AlignCenter, AlignRight, Undo2, Redo2, Loader2,
+  Table as TableIcon, AlignLeft, AlignCenter, AlignRight, Undo2, Redo2, Loader2, Code2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Figure } from './extensions/figure';
+import { blogEditorExtensions, HEADING_LEVELS } from '@/lib/blog/tiptapExtensions';
 
 export interface RichTextValue {
   json: Record<string, unknown> | null;
@@ -34,8 +27,6 @@ interface RichTextEditorProps {
   initialContent?: Record<string, unknown> | string | null;
   onChange: (value: RichTextValue) => void;
 }
-
-const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
 async function uploadImage(file: File): Promise<string | null> {
   const fd = new FormData();
@@ -83,6 +74,19 @@ function Divider() {
 function Toolbar({ editor }: { editor: Editor }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importHtml, setImportHtml] = useState('');
+
+  const runImport = useCallback(() => {
+    const html = importHtml.trim();
+    if (!html) return;
+    // Parsing through the schema strips <head>/<style>/<script>/classes/inline styles,
+    // leaving only clean semantic nodes.
+    editor.chain().focus().setContent(html, { parseOptions: { preserveWhitespace: false } }).run();
+    setImportHtml('');
+    setImportOpen(false);
+    toast.success('HTML imported & cleaned');
+  }, [editor, importHtml]);
 
   const handleImageFile = useCallback(async (file: File) => {
     if (uploading) return;
@@ -164,6 +168,8 @@ function Toolbar({ editor }: { editor: Editor }) {
 
       <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo"><Undo2 className="h-4 w-4" /></ToolbarButton>
       <ToolbarButton onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} title="Redo"><Redo2 className="h-4 w-4" /></ToolbarButton>
+      <Divider />
+      <ToolbarButton onClick={() => setImportOpen(true)} title="Import / paste HTML"><Code2 className="h-4 w-4" /></ToolbarButton>
 
       <input
         ref={fileInputRef}
@@ -176,6 +182,30 @@ function Toolbar({ editor }: { editor: Editor }) {
           e.target.value = '';
         }}
       />
+
+      {importOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setImportOpen(false)}>
+          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100">
+              <h3 className="text-base font-bold font-manrope text-gray-900">Import HTML</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Paste any HTML (even a full document). Styling, scripts and classes are stripped — only semantic content is kept. This replaces the current content.</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <textarea
+                value={importHtml}
+                onChange={(e) => setImportHtml(e.target.value)}
+                placeholder="<h2>Heading</h2><p>Paragraph…</p><table>…</table>"
+                rows={12}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-xs font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f] resize-y"
+              />
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setImportOpen(false)} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">Cancel</button>
+                <button type="button" onClick={runImport} disabled={!importHtml.trim()} className="px-5 py-2.5 text-sm font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-full transition-colors disabled:opacity-50">Import &amp; clean</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -188,23 +218,25 @@ export function RichTextEditor({ initialContent, onChange }: RichTextEditorProps
 
   const editor = useEditor({
     immediatelyRender: false, // required for Next.js SSR — avoids hydration mismatch
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [...HEADING_LEVELS] },
-        link: { openOnClick: false, autolink: true, HTMLAttributes: { rel: 'noopener noreferrer' } },
-      }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Youtube.configure({ controls: true, nocookie: true, modestBranding: true }),
-      Table.configure({ resizable: true }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      Figure,
-    ],
+    extensions: blogEditorExtensions, // shared schema — identical to the server-side renderer
     content: initialContent ?? '',
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none min-h-[420px] px-5 py-4 focus:outline-none',
+      },
+      // Parse pasted raw HTML *source* (arriving as text/plain) into clean nodes,
+      // instead of inserting it as escaped literal text.
+      handlePaste(view, event) {
+        const cd = event.clipboardData;
+        if (!cd) return false;
+        const html = cd.getData('text/html');
+        const text = cd.getData('text/plain');
+        if (!html && text && /<[a-z!][\s\S]*>/i.test(text)) {
+          event.preventDefault();
+          editor?.chain().focus().insertContent(text, { parseOptions: { preserveWhitespace: false } }).run();
+          return true;
+        }
+        return false;
       },
       handleDrop(view, event) {
         const file = event.dataTransfer?.files?.[0];

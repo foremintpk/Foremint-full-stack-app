@@ -101,6 +101,34 @@ export function countWords(html: string): number {
 
 // ── Table of Contents ───────────────────────────────────────────────────────────
 
+/**
+ * Strip presentation from generated HTML so stored content is purely structural:
+ * removes every `style`/`class` attribute and demotes any body `<h1>` to `<h2>`
+ * (each page keeps exactly one H1 — the article title, rendered by the frontend).
+ */
+export function sanitizeBlogHtml(html: string): string {
+  if (!html) return '';
+  let out = html
+    // strip presentation attributes
+    .replace(/\s(?:style|class)\s*=\s*"[^"]*"/gi, '')
+    .replace(/\s(?:style|class)\s*=\s*'[^']*'/gi, '')
+    // drop colgroup (only ever held column widths, now stripped) + redundant defaults
+    .replace(/<colgroup>[\s\S]*?<\/colgroup>/gi, '')
+    .replace(/\s(?:colspan|rowspan)\s*=\s*["']1["']/gi, '')
+    // demote any body <h1> to <h2> (the page title is the single H1)
+    .replace(/<(\/?)h1(\s|>)/gi, '<$1h2$2');
+
+  // Promote a leading all-<th> row into <thead> for proper table semantics.
+  out = out.replace(
+    /<table>\s*<tbody>\s*(<tr>(?:(?!<\/tr>)[\s\S])*?<\/tr>)/gi,
+    (match, firstRow: string) =>
+      /<th[\s>]/i.test(firstRow) && !/<td[\s>]/i.test(firstRow)
+        ? `<table><thead>${firstRow}</thead><tbody>`
+        : match,
+  );
+  return out;
+}
+
 const HEADING_RE = /<h([23])\b([^>]*)>([\s\S]*?)<\/h\1>/gi;
 
 /**

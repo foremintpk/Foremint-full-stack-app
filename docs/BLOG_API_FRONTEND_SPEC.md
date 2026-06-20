@@ -19,7 +19,7 @@
 | **Field casing** | **camelCase** in JSON (DB columns are snake_case but the API maps them). |
 | **Only published content** | Public endpoints return **only** posts with `status = 'published'` **and** `publishedAt <= now`. Draft / scheduled / archived posts are never returned. |
 | **Image URLs** | Always **absolute Cloudinary HTTPS URLs** (e.g. `https://res.cloudinary.com/<cloud>/image/upload/...`). **Never** prepend a base URL. May be `null`. |
-| **Content rendering** | `contentHtml` is **ready-to-render sanitized-structure HTML** with heading anchor IDs already injected. Render with `dangerouslySetInnerHTML`. (`contentJson` is the Tiptap document if you ever need structured access — optional.) |
+| **Content rendering** | `contentHtml` is **server-generated, clean semantic HTML** (the article *body* fragment): only `h2–h6, p, ul/ol/li, table>thead/tbody/tr/th/td, figure>img+figcaption, blockquote, pre>code, a, hr, iframe` — **no** `class`/`style`/wrapper `div`s, exactly one logical heading hierarchy (any inner H1 is demoted to H2), heading anchor IDs already injected, images `loading="lazy"`. Render it with `dangerouslySetInnerHTML` inside your own design-system wrapper (a `BlogContent` component) — style by element selector, never inject classes. (`contentJson` is the Tiptap document, consumed by the editor only.) |
 
 ---
 
@@ -195,7 +195,7 @@ Same object shape as a listing post, but with the body fields populated:
 - **“ON THIS PAGE” sidebar** = `post.toc` (array of `{ id, title, level }`). Each `id` matches an `id` attribute already present on the `<h2>`/`<h3>` in `contentHtml`. Build anchor links as `#${entry.id}` and use `level` (2 or 3) for indentation.
 - **Article body** = render `post.contentHtml` with `dangerouslySetInnerHTML`. Heading anchors already exist for scroll-spy.
 - **Related resources cards** = `post.relatedBlogs` (up to 3; same category first, then most recent).
-- **SEO `<head>`** = use `metaTitle`, `metaDescription`, `canonicalUrl`, `ogImage`, etc. Inject `structuredData` values as `<script type="application/ld+json">` (one per key: `article`, `faq`, `breadcrumb`).
+- **SEO `<head>`** = use `metaTitle`, `metaDescription`, `canonicalUrl`, `ogImage`, etc. Inject **every** `structuredData` value as a `<script type="application/ld+json">` (iterate the object — keys: `article`, `organization`, `author`, optional `faq`, `breadcrumb`).
 
 ---
 
@@ -326,7 +326,7 @@ then newest, so the list is **never empty** on a fresh site.
 | `primaryEntity` | string | yes | AEO metadata (usually not displayed). |
 | `keyTakeaways` | string[] | no (may be `[]`) | Optional bullet list. Usually empty currently. |
 | `faqs` | `{question,answer}[]` | no (may be `[]`) | FAQ accordion + FAQ schema. |
-| `structuredData` | object | yes | JSON-LD blocks: `article`, optional `faq`, `breadcrumb`. Inject as `<script type="application/ld+json">`. |
+| `structuredData` | object | yes | JSON-LD blocks: `article` (with publisher), `organization`, `author`, optional `faq`, `breadcrumb`. Inject each as `<script type="application/ld+json">`. |
 
 ### `relatedBlogs[]` / category-post summary shape
 `{ id, title, slug, excerpt, featuredImageUrl, featuredImageAlt, categoryName, categorySlug, readingTimeMinutes, publishedAt }`

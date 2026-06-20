@@ -7,11 +7,13 @@ import type { BlogStatus, BlogFaq } from '@/types/admin';
 import {
   slugify,
   processBlogContent,
+  sanitizeBlogHtml,
   generateExcerpt,
   generateMetaTitle,
   generateMetaDescription,
   stripHtml,
 } from '@/lib/blog/content';
+import { generateBlogHtmlFromJson } from '@/lib/blog/render';
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 
@@ -86,14 +88,37 @@ function buildStructuredData(params: {
   categoryName?: string | null;
 }): Record<string, unknown> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://foremint.pk';
+  const orgName = 'ForeMint';
+  const logoUrl = `${baseUrl}/logo.png`;
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: orgName,
+    url: baseUrl,
+    logo: { '@type': 'ImageObject', url: logoUrl },
+  };
+
+  const authorSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: params.author,
+  };
+
   const articleSchema = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: params.title,
     description: params.excerpt,
     author: { '@type': 'Person', name: params.author },
+    publisher: {
+      '@type': 'Organization',
+      name: orgName,
+      logo: { '@type': 'ImageObject', url: logoUrl },
+    },
     datePublished: params.publishedAt ?? params.updatedAt,
     dateModified: params.updatedAt,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': `${baseUrl}/blog/${params.slug}` },
     url: `${baseUrl}/blog/${params.slug}`,
     ...(params.featuredImageUrl ? { image: params.featuredImageUrl } : {}),
     ...(params.categoryName ? { articleSection: params.categoryName } : {}),
@@ -122,7 +147,13 @@ function buildStructuredData(params: {
     ],
   };
 
-  return { article: articleSchema, ...(faqSchema ? { faq: faqSchema } : {}), breadcrumb };
+  return {
+    article: articleSchema,
+    organization: organizationSchema,
+    author: authorSchema,
+    ...(faqSchema ? { faq: faqSchema } : {}),
+    breadcrumb,
+  };
 }
 
 // ── Parse + derive form data ────────────────────────────────────────────────────
@@ -161,7 +192,12 @@ function parseBlogFormData(formData: FormData) {
   const tagIds = formData.getAll('tagIds').map(v => String(v)).filter(Boolean);
 
   // ── Auto-derived values ──
-  const { html: contentHtml, toc } = processBlogContent(contentHtmlRaw);
+  // Semantic HTML is generated server-side from the structured JSON (deterministic,
+  // styling-free). Fall back to the sanitized client HTML only for empty/legacy JSON.
+  const generated = generateBlogHtmlFromJson(contentJson);
+  const { html: contentHtml, toc } = generated.html
+    ? generated
+    : processBlogContent(sanitizeBlogHtml(contentHtmlRaw));
   const plainText = stripHtml(contentHtml);
   const excerpt = excerptRaw || generateExcerpt(contentHtml);
   const metaTitle = metaTitleRaw || generateMetaTitle(title);
