@@ -80,61 +80,35 @@ export async function POST(
     const buffer = Buffer.from(await file.arrayBuffer());
     const timestamp = Date.now();
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const uniqueFileName = `${timestamp}-${sanitizedFileName}`;
 
+    // All documents and images are stored in Cloudinary. Supabase Storage is no
+    // longer used here — the private 'onboarding-documents' bucket has no admin
+    // INSERT policy, so small-file uploads were failing with an RLS violation.
+    const storageType: 'cloudinary' = 'cloudinary';
+    const storagePath: string | null = null;
     let uploadUrl = '';
-    let storageType: 'cloudinary' | 'supabase' = 'supabase';
-    let storagePath: string | null = null;
     let publicId: string | null = null;
 
-    // 4. Hybrid Routing Rule: > 100KB -> Cloudinary; <= 100KB -> Supabase Storage
-    if (file.size > 100000) {
-      storageType = 'cloudinary';
-      const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      // PDFs → resource_type:'raw' preserves the file as-is so browsers receive
-      // actual PDF bytes. Keep the full filename (including .pdf) as the public_id
-      // so Cloudinary includes the extension in the delivery URL and serves
-      // Content-Type: application/pdf. Images use 'auto' with no extension.
-      const uploadResult: any = await new Promise((resolve, reject) => {
-        cloudinary.uploader.upload_stream({
-          folder: `foremint/orders/${orderId}`,
-          public_id: isPdfFile
-            ? `${timestamp}-${sanitizedFileName}`
-            : `${timestamp}-${sanitizedFileName.split('.')[0]}`,
-          resource_type: isPdfFile ? 'raw' : 'auto',
-        }, (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }).end(buffer);
-      });
+    const isPdfFile = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    // PDFs → resource_type:'raw' preserves the file as-is so browsers receive
+    // actual PDF bytes. Keep the full filename (including .pdf) as the public_id
+    // so Cloudinary includes the extension in the delivery URL and serves
+    // Content-Type: application/pdf. Images use 'auto' with no extension.
+    const uploadResult: any = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream({
+        folder: `foremint/orders/${orderId}`,
+        public_id: isPdfFile
+          ? `${timestamp}-${sanitizedFileName}`
+          : `${timestamp}-${sanitizedFileName.split('.')[0]}`,
+        resource_type: isPdfFile ? 'raw' : 'auto',
+      }, (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }).end(buffer);
+    });
 
-      uploadUrl = uploadResult.secure_url;
-      publicId = uploadResult.public_id;
-    } else {
-      // Supabase Storage
-      storageType = 'supabase';
-      const bucketName = 'onboarding-documents';
-      const path = `${orderId}/internal_ops/${uniqueFileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(bucketName)
-        .upload(path, buffer, {
-          contentType: file.type,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        return NextResponse.json({ error: uploadError.message }, { status: 500 });
-      }
-
-      storagePath = `${bucketName}/${path}`;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(path);
-
-      uploadUrl = publicUrl;
-    }
+    uploadUrl = uploadResult.secure_url;
+    publicId = uploadResult.public_id;
 
     // 5. Version Control: Supersede old active versions of this fixed slot
     if (slotKey !== 'additional') {
@@ -160,10 +134,7 @@ export async function POST(
     if (slotKey === 'payment_receipt') docType = 'payment_receipt';
 
     // 6. Insert new document record
-    const cloudinaryResourceType =
-      storageType === 'cloudinary'
-        ? (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf') ? 'raw' : 'image')
-        : null;
+    const cloudinaryResourceType = isPdfFile ? 'raw' : 'image';
 
     const { data: docRecord, error: insertError } = await (supabase as any)
       .from('documents')

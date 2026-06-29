@@ -52,11 +52,24 @@ export async function GET(
     // RLS policy "Customers can read order documents" already ensured the SELECT above
     // only returned rows the user is permitted to see. canViewDocument provides an
     // additional server-side check for belt-and-suspenders.
-    const authorized = canViewDocument(
+    let authorized = canViewDocument(
       role as string | null,
       user.id,
       { profile_id: doc.profile_id as string, order_id: doc.order_id as string | null }
     );
+
+    // B2B (read-only) customers don't own the order, so canViewDocument returns false.
+    // Grant read access when the document's order is explicitly assigned to them —
+    // mirrors the assignment check used by getB2BLlcDetail for the document list.
+    if (!authorized && doc.order_id) {
+      const { data: assignment } = await adminSdk
+        .from('b2b_order_assignments')
+        .select('id')
+        .eq('order_id', doc.order_id as string)
+        .eq('b2b_user_id', user.id)
+        .maybeSingle();
+      authorized = !!assignment;
+    }
 
     if (!authorized) {
       return NextResponse.json(

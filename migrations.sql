@@ -692,4 +692,32 @@ END $$;
 
 NOTIFY pgrst, 'reload schema';
 
+-- ============================================================
+-- B2B read-only document access
+-- ============================================================
+-- B2B (read-only) customers can READ documents for orders explicitly assigned
+-- to them via b2b_order_assignments. SELECT only — they cannot upload, modify,
+-- or delete. The document list is fetched server-side via the service role, but
+-- the /api/documents/[id]/view route reads with the user client, so this policy
+-- is required for assigned B2B users to open documents.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'documents'
+      AND policyname = 'B2B can read assigned order documents'
+  ) THEN
+    CREATE POLICY "B2B can read assigned order documents"
+      ON public.documents FOR SELECT
+      USING (
+        EXISTS (
+          SELECT 1 FROM public.b2b_order_assignments a
+          WHERE a.order_id = documents.order_id
+            AND a.b2b_user_id = auth.uid()
+        )
+      );
+  END IF;
+END $$;
+
+NOTIFY pgrst, 'reload schema';
+
 

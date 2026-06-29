@@ -42,3 +42,6 @@ next-env.d.ts
 
 # scratch / investigation artifacts
 /scratch/
+
+# migration tool runtime artifacts (logs, report, state ledger)
+/migrations/wordpress

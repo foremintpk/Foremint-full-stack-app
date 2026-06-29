@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:scan": "tsx migrations/wordpress/migrate.ts scan",
+    "migrate:dry": "tsx migrations/wordpress/migrate.ts dry",
+    "migrate": "tsx migrations/wordpress/migrate.ts run",
+    "migrate:rollback": "tsx migrations/wordpress/rollback.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -53,6 +57,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
