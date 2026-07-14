@@ -11,6 +11,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { X } from 'lucide-react';
 import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
@@ -39,6 +40,7 @@ function AdminShellInner({
   children,
 }: AdminShellProps) {
   const [liveBadges, setLiveBadges] = useState<BadgeCounts>(badgeCounts);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   useRefreshOrchestrator(); // 60 s full-page reconciliation
   const supabase = useRealtime();
   const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,21 +142,52 @@ function AdminShellInner({
     return () => clearInterval(id);
   }, []);
 
+  const handleMobileToggle = useCallback(() => {
+    setIsMobileMenuOpen((prev) => !prev);
+  }, []);
+
   return (
     <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>
       <LlcNameProvider initialNames={initialLlcNames}>
         <AdminScrollLock />
         <div className="flex h-screen w-full overflow-hidden bg-gray-50 font-inter">
-          <div className="relative flex-shrink-0 overflow-visible">
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:relative lg:flex lg:flex-shrink-0 lg:overflow-visible">
             <AdminSidebar badgeCounts={liveBadges} />
           </div>
+
+          {/* Mobile Navigation Drawer Overlay */}
+          {isMobileMenuOpen && (
+            <div className="fixed inset-0 bg-black/50 z-50 lg:hidden animate-in fade-in duration-200">
+              <div className="flex w-64 h-full bg-[#34088f] text-white flex-col animate-in slide-in-from-left duration-200">
+                <div className="h-14 flex items-center justify-between px-4 border-b border-white/10">
+                  <span className="text-lg font-black tracking-widest text-white uppercase font-manrope">
+                    Foremint
+                  </span>
+                  <button
+                    onClick={handleMobileToggle}
+                    aria-label="Close menu"
+                    className="p-1 rounded-full text-white/70 hover:text-white hover:bg-white/10"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <AdminSidebar badgeCounts={liveBadges} />
+                </div>
+              </div>
+              <div className="absolute inset-0 left-64 h-full w-full" onClick={handleMobileToggle} />
+            </div>
+          )}
+
           <div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
             <AdminHeader
               adminProfile={adminProfile}
               initialNotifications={initialNotifications}
               onBadgeCountChange={handleNotificationBadgeChange}
+              onMenuToggle={handleMobileToggle}
             />
-            <main className="flex-1 overflow-y-auto bg-gray-50/80 focus:outline-none p-6 md:p-8">
+            <main className="flex-1 overflow-y-auto bg-gray-50/80 focus:outline-none p-4 md:p-6 lg:p-8">
               <div className="max-w-7xl mx-auto space-y-6">
                 {children}
               </div>

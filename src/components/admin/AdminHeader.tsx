@@ -11,7 +11,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useTransition } from 'react';
-import { RefreshCw, LogOut, User, Loader2 } from 'lucide-react';
+import { RefreshCw, LogOut, User, Loader2, Menu } from 'lucide-react';
 import { AdminProfile, SafeAdminNotification, AdminRole } from '@/types/admin';
 import { clearNotifCache } from '@/lib/admin/notificationCache';
 import { refreshAdminData } from '@/lib/admin/actions/refreshAdmin';
@@ -23,12 +23,14 @@ interface AdminHeaderProps {
  adminProfile: AdminProfile;
  initialNotifications: SafeAdminNotification[];
  onBadgeCountChange?: (count: number) => void;
+ onMenuToggle?: () => void;
 }
 
 export function AdminHeader({
  adminProfile,
  initialNotifications,
  onBadgeCountChange,
+ onMenuToggle,
 }: AdminHeaderProps) {
  const [profileOpen, setProfileOpen] = useState(false);
  const [isPending, startTransition] = useTransition();
@@ -65,16 +67,28 @@ export function AdminHeader({
 
  return (
  <header
- className="h-14 bg-white border-b border-gray-200 px-6 flex items-center justify-between z-30 flex-shrink-0"
+ className="h-14 bg-white border-b border-gray-200 px-4 md:px-6 flex items-center justify-between z-30 flex-shrink-0"
  style={{ minHeight: '56px' }}
  >
- {/* Breadcrumb section */}
- <div className="flex items-center">
+ {/* Left section: Drawer Menu trigger (Mobile) & Breadcrumbs (Desktop) */}
+ <div className="flex items-center gap-3">
+ <button
+ onClick={onMenuToggle}
+ aria-label="Toggle navigation menu"
+ className="p-2 -ml-2 rounded-full text-gray-500 hover:text-black hover:bg-gray-100 lg:hidden"
+ >
+ <Menu className="w-5 h-5" />
+ </button>
+ <div className="hidden sm:block">
  <AdminBreadcrumb />
+ </div>
+ <span className="sm:hidden text-sm font-bold text-black font-manrope">
+ Admin Panel
+ </span>
  </div>
 
  {/* Action triggers */}
- <div className="flex items-center gap-4">
+ <div className="flex items-center gap-3 md:gap-4">
  {/* Refresh button with dynamic spinning transition indicator */}
  <button
  onClick={handleRefresh}
