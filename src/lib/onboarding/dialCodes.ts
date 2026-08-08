@@ -7,8 +7,10 @@ export interface DialCode {
   iso: string    // ISO 3166-1 alpha-2, used as a stable option key
 }
 
+// Note: option values must be unique — countries sharing a dial code
+// (US/Canada +1) are merged into a single entry.
 export const DIAL_CODES: DialCode[] = [
-  { country: 'United States',        code: '+1',   iso: 'US' },
+  { country: 'United States / Canada', code: '+1', iso: 'US' },
   { country: 'Pakistan',             code: '+92',  iso: 'PK' },
   { country: 'United Kingdom',       code: '+44',  iso: 'GB' },
   { country: 'United Arab Emirates', code: '+971', iso: 'AE' },
@@ -18,7 +20,6 @@ export const DIAL_CODES: DialCode[] = [
   { country: 'Bangladesh',           code: '+880', iso: 'BD' },
   { country: 'Belgium',              code: '+32',  iso: 'BE' },
   { country: 'Brazil',               code: '+55',  iso: 'BR' },
-  { country: 'Canada',               code: '+1',   iso: 'CA' },
   { country: 'China',                code: '+86',  iso: 'CN' },
   { country: 'Egypt',                code: '+20',  iso: 'EG' },
   { country: 'France',               code: '+33',  iso: 'FR' },

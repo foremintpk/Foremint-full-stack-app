@@ -52,16 +52,16 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5 min-w-0">
           <label className="text-sm font-semibold text-gray-800">
             WhatsApp Number
             <span className="text-[#34088f] ml-0.5">*</span>
           </label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             <select
               value={member.phoneCountryCode || '+1'}
               onChange={e => onChange({ phoneCountryCode: e.target.value })}
-              className={`${inputClass} w-auto flex-shrink-0 px-2`}
+              className="w-[104px] flex-shrink-0 bg-white border border-gray-200 rounded-lg pl-3 pr-1 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#34088f]/25 focus:border-[#34088f] transition-colors"
               aria-label="Country code"
             >
               {DIAL_CODES.map(dc => (
@@ -76,7 +76,7 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
               value={member.phoneNumber}
               onChange={e => onChange({ phoneNumber: e.target.value.replace(/[^\d\s-]/g, '') })}
               placeholder="300 1234567"
-              className={inputClass}
+              className={`${inputClass} flex-1 min-w-0`}
             />
           </div>
         </div>
