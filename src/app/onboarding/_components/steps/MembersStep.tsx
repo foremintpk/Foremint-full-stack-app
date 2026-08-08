@@ -15,6 +15,8 @@ function createMember(index: number, isMultiMember: boolean): OnboardingMember {
   return {
     id: generateUuid(),
     fullName: '',
+    phoneCountryCode: '+1',
+    phoneNumber: '',
     addressLine1: '',
     addressLine2: '',
     city: '',
@@ -22,6 +24,7 @@ function createMember(index: number, isMultiMember: boolean): OnboardingMember {
     postalCode: '',
     country: '',
     position: isMultiMember ? 'co-founder' : undefined,
+    idDocuments: [],
     documentUrl: null,
     documentPublicId: null,
     documentFileName: null,

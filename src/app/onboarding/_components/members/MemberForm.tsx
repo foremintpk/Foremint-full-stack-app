@@ -1,6 +1,7 @@
 "use client"
 
 import { MemberDocumentUpload } from './MemberDocumentUpload'
+import { DIAL_CODES } from '@/lib/onboarding/dialCodes'
 import type { OnboardingMember, MemberPosition } from '@/types/onboarding'
 
 const POSITION_OPTIONS: { value: MemberPosition; label: string }[] = [
@@ -51,14 +52,47 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
           />
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-semibold text-gray-800">
+            WhatsApp Number
+            <span className="text-[#34088f] ml-0.5">*</span>
+          </label>
+          <div className="flex gap-2">
+            <select
+              value={member.phoneCountryCode || '+1'}
+              onChange={e => onChange({ phoneCountryCode: e.target.value })}
+              className={`${inputClass} w-auto flex-shrink-0 px-2`}
+              aria-label="Country code"
+            >
+              {DIAL_CODES.map(dc => (
+                <option key={dc.iso} value={dc.code}>
+                  {dc.iso} {dc.code}
+                </option>
+              ))}
+            </select>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={member.phoneNumber}
+              onChange={e => onChange({ phoneNumber: e.target.value.replace(/[^\d\s-]/g, '') })}
+              placeholder="300 1234567"
+              className={inputClass}
+            />
+          </div>
+        </div>
+
         <div className="md:col-span-2 xl:col-span-4">
           <MemberDocumentUpload
             memberId={member.id}
             slotKey={member.slotKey}
-            existingUrl={member.documentUrl}
-            existingFileName={member.documentFileName}
-            onUploaded={(url, publicId, fileName) =>
-              onChange({ documentUrl: url, documentPublicId: publicId, documentFileName: fileName })
+            documents={member.idDocuments ?? []}
+            onChange={docs =>
+              onChange({
+                idDocuments: docs,
+                documentUrl: docs[0]?.url ?? null,
+                documentPublicId: docs[0]?.publicId ?? null,
+                documentFileName: docs[0]?.fileName ?? null,
+              })
             }
           />
         </div>

@@ -207,15 +207,23 @@ export interface LlcListResult {
 export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed'
 // Note: 'cancelled' exists in DB but is not selectable from the status dropdown UI
 
+export interface MemberIdDocEntry {
+  id: string | null             // document.id when a DB record exists
+  url: string | null
+  fileName: string | null
+}
+
 export interface OrderMember {
   index: number
   position: string
   name: string
+  phone: string | null          // WhatsApp number incl. dial code, e.g. "+1 5550100"
   address: string
   city: string
   state: string
   country: string
   ssnItin: string | null
+  idDocs: MemberIdDocEntry[]    // all identity documents for this member
   idDocId: string | null        // document.id for the member's identity document
   idDocUrl: string | null       // kept for legacy reference; prefer routing through idDocId
   hasResubmitRequest: boolean   // true if pending resubmission request exists

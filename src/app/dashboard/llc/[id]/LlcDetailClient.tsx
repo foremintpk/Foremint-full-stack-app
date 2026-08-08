@@ -287,6 +287,7 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
               : undefined
           } />
           <InfoRow label="State" value={llc.formationStateName || llc.formationState} />
+          <InfoRow label="WhatsApp Number" value={llc.members?.[0]?.phone ?? llc.clientPhone ?? undefined} />
           <InfoRow label="Formation Date" value={formatDate(cd?.formationDate)} />
           <CopyField label="EIN Number" value={cd?.einNumber ?? null} />
           <CopyField label="Filing ID" value={cd?.filingId ?? null} />
@@ -339,6 +340,10 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
                 {/* Detail rows */}
                 <div className="px-5 py-4 space-y-3">
                   <div className="flex gap-3">
+                    <span className="text-xs text-gray-400 font-inter w-20 flex-shrink-0 pt-0.5">WhatsApp:</span>
+                    <span className="text-sm text-gray-800 font-inter">{member.phone || '—'}</span>
+                  </div>
+                  <div className="flex gap-3">
                     <span className="text-xs text-gray-400 font-inter w-20 flex-shrink-0 pt-0.5">Address:</span>
                     <span className="text-sm text-gray-800 font-inter">
                       {[member.address, member.city, member.state, member.country].filter(Boolean).join(', ') || '—'}
@@ -350,29 +355,38 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
                   </div>
                 </div>
 
-                {/* Identity document */}
-                {member.idDocId && (
+                {/* Identity documents */}
+                {member.idDocs.some(d => d.id) && (
                   <div className="px-5 pb-4 border-t border-gray-100 pt-3">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-manrope mb-3">
-                      Identity Document
+                      {member.idDocs.filter(d => d.id).length > 1 ? 'Identity Documents' : 'Identity Document'}
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      <a
-                        href={`/api/documents/${member.idDocId}/view`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#34088f] text-white text-xs font-semibold hover:bg-[#2a0673] transition-colors font-inter"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> View ID
-                      </a>
-                      <a
-                        href={`/api/documents/${member.idDocId}/view?download=1`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-gray-200 text-gray-700 text-xs font-semibold hover:border-[#34088f]/40 hover:text-[#34088f] transition-colors font-inter"
-                      >
-                        <Download className="w-3.5 h-3.5" /> Download
-                      </a>
+                    <div className="space-y-2">
+                      {member.idDocs.filter(d => d.id).map((doc, di, visible) => (
+                        <div key={doc.id} className="flex flex-wrap items-center gap-2">
+                          {visible.length > 1 && (
+                            <span className="text-[10px] font-bold text-gray-400 font-inter w-8 flex-shrink-0">
+                              ID {di + 1}
+                            </span>
+                          )}
+                          <a
+                            href={`/api/documents/${doc.id}/view`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-[#34088f] text-white text-xs font-semibold hover:bg-[#2a0673] transition-colors font-inter"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View ID
+                          </a>
+                          <a
+                            href={`/api/documents/${doc.id}/view?download=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-gray-200 text-gray-700 text-xs font-semibold hover:border-[#34088f]/40 hover:text-[#34088f] transition-colors font-inter"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </a>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}

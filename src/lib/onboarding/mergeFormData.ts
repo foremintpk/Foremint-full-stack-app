@@ -1,6 +1,7 @@
 import type {
   OnboardingFormData,
   OnboardingMember,
+  MemberIdDocument,
   SelectedAddon,
   PaymentMethod,
 } from '@/types/onboarding'
@@ -36,9 +37,33 @@ const EMPTY_FORM: OnboardingFormData = {
 }
 
 function normalizeMember(raw: Record<string, unknown>, index: number): OnboardingMember {
+  const slotKey = String(raw.slotKey ?? `member_${index}_passport`)
+
+  // Multi-document list; older drafts only carry the single legacy document fields.
+  const rawDocs = Array.isArray(raw.idDocuments) ? raw.idDocuments : []
+  let idDocuments: MemberIdDocument[] = rawDocs
+    .map((d: Record<string, unknown>, i: number) => ({
+      url: String(d?.url ?? ''),
+      publicId: String(d?.publicId ?? ''),
+      fileName: String(d?.fileName ?? ''),
+      slotKey: String(d?.slotKey ?? (i === 0 ? slotKey : `${slotKey}_${i + 1}`)),
+    }))
+    .filter(d => d.url)
+
+  if (idDocuments.length === 0 && raw.documentUrl) {
+    idDocuments = [{
+      url: String(raw.documentUrl),
+      publicId: String(raw.documentPublicId ?? ''),
+      fileName: String(raw.documentFileName ?? ''),
+      slotKey,
+    }]
+  }
+
   return {
     id: String(raw.id ?? generateUuid()),
     fullName: String(raw.fullName ?? raw.name ?? ''),
+    phoneCountryCode: String(raw.phoneCountryCode ?? '+1'),
+    phoneNumber: String(raw.phoneNumber ?? ''),
     addressLine1: String(raw.addressLine1 ?? raw.address ?? ''),
     addressLine2: String(raw.addressLine2 ?? ''),
     city: String(raw.city ?? ''),
@@ -46,10 +71,11 @@ function normalizeMember(raw: Record<string, unknown>, index: number): Onboardin
     postalCode: String(raw.postalCode ?? ''),
     country: String(raw.country ?? ''),
     position: raw.position as OnboardingMember['position'],
-    documentUrl: (raw.documentUrl as string) ?? null,
-    documentPublicId: (raw.documentPublicId as string) ?? null,
-    documentFileName: (raw.documentFileName as string) ?? null,
-    slotKey: String(raw.slotKey ?? `member_${index}_passport`),
+    idDocuments,
+    documentUrl: idDocuments[0]?.url ?? null,
+    documentPublicId: idDocuments[0]?.publicId || null,
+    documentFileName: idDocuments[0]?.fileName || null,
+    slotKey,
   }
 }
 

@@ -82,7 +82,7 @@ export function OverviewTab({ order, internalData: _internalData, billingEntries
       <Card title="Client Information" icon={User}>
         <Row label="Client Name"  value={order.clientName} />
         <Row label="Email"        value={order.clientEmail} />
-        <Row label="Phone"        value={order.clientPhone} />
+        <Row label="Phone"        value={order.members?.[0]?.phone ?? order.clientPhone} />
         <Row label="Member Type"  value={order.memberType ?? snapshot?.memberType} />
         <Row label="Entity Type"  value={order.entityType ?? snapshot?.entityType} />
       </Card>

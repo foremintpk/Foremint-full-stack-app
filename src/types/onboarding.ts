@@ -156,9 +156,20 @@ export interface OrderSubmissionResult {
 
 export type MemberPosition = 'co-founder' | 'manager'
 
+export const MAX_MEMBER_ID_DOCUMENTS = 5
+
+export interface MemberIdDocument {
+  url: string
+  publicId: string
+  fileName: string
+  slotKey: string                  // e.g. "member_0_passport", "member_0_passport_2"
+}
+
 export interface OnboardingMember {
   id: string              // client-side uuid, e.g. crypto.randomUUID()
   fullName: string
+  phoneCountryCode: string         // dial code, e.g. "+1"
+  phoneNumber: string              // national number, digits only
   addressLine1: string
   addressLine2: string
   city: string
@@ -166,10 +177,13 @@ export interface OnboardingMember {
   postalCode: string
   country: string
   position?: MemberPosition        // only for multi-member LLC
+  idDocuments: MemberIdDocument[]  // up to MAX_MEMBER_ID_DOCUMENTS files
+  // Legacy single-document fields — always mirror idDocuments[0] for
+  // backward compatibility with older snapshots and consumers.
   documentUrl: string | null       // Cloudinary URL
   documentPublicId: string | null  // Cloudinary public_id
   documentFileName: string | null
-  slotKey: string                  // e.g. "member_0_passport"
+  slotKey: string                  // base slot, e.g. "member_0_passport"
 }
 
 export interface PublicAddon {

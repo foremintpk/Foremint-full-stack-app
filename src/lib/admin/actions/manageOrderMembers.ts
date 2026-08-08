@@ -5,8 +5,23 @@ import { revalidateOrder } from './revalidateOrder';
 
 export interface MemberInput {
   fullName: string;
+  phone?: string;
   address: string;
   ssnItin?: string;
+}
+
+/**
+ * Split a combined phone string ("+92 3001234567") into the dial-code +
+ * number fields used by onboarding members, so admin edits round-trip
+ * through the same snapshot shape.
+ */
+function parsePhone(phone: string): { phoneCountryCode: string; phoneNumber: string } {
+  const trimmed = phone.trim();
+  const match = trimmed.match(/^(\+\d{1,4})[\s-]*(.*)$/);
+  if (match && match[2]) {
+    return { phoneCountryCode: match[1], phoneNumber: match[2].trim() };
+  }
+  return { phoneCountryCode: '', phoneNumber: trimmed };
 }
 
 export async function addOrderMember(
@@ -34,6 +49,7 @@ export async function addOrderMember(
 
     const newMember = {
       fullName: member.fullName,
+      ...parsePhone(member.phone ?? ''),
       address: member.address,
       ssnItin: member.ssnItin ?? '',
       position: 'Member',
@@ -72,7 +88,7 @@ export async function addOrderMember(
 export async function updateOrderMemberAt(
   orderId: string,
   memberIndex: number,
-  updates: { fullName: string; address: string; ssnItin: string }
+  updates: { fullName: string; phone?: string; address: string; ssnItin: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
@@ -98,7 +114,14 @@ export async function updateOrderMemberAt(
 
     const updatedMembers = existingMembers.map((m: any, i: number) =>
       i === memberIndex
-        ? { ...m, fullName: updates.fullName, address: updates.address, addressLine1: updates.address, ssnItin: updates.ssnItin }
+        ? {
+            ...m,
+            fullName: updates.fullName,
+            ...(updates.phone !== undefined ? parsePhone(updates.phone) : {}),
+            address: updates.address,
+            addressLine1: updates.address,
+            ssnItin: updates.ssnItin,
+          }
         : m
     );
 

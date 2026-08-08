@@ -22,6 +22,20 @@ function validateMembers(formData: OnboardingFormData): string | null {
   if (incompleteIndex >= 0) {
     return `Please complete the required fields for Member ${incompleteIndex + 1}.`;
   }
+
+  const invalidPhoneIndex = members.findIndex(member =>
+    (member.phoneNumber ?? '').replace(/\D/g, '').length < 7
+  );
+  if (invalidPhoneIndex >= 0) {
+    return `Please enter a valid WhatsApp number for Member ${invalidPhoneIndex + 1}.`;
+  }
+
+  const missingDocIndex = members.findIndex(member =>
+    (member.idDocuments?.length ?? 0) === 0 && !member.documentUrl
+  );
+  if (missingDocIndex >= 0) {
+    return `Please upload a Passport / Government ID for Member ${missingDocIndex + 1}.`;
+  }
   return null;
 }
 

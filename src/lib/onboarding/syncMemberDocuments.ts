@@ -92,13 +92,15 @@ export interface SyncMemberDocumentsParams {
     Pick<
       OnboardingMember,
       'documentUrl' | 'documentPublicId' | 'documentFileName' | 'slotKey'
-    >
+    > & Partial<Pick<OnboardingMember, 'idDocuments'>>
   >
 }
 
 /**
  * Persist onboarding member identity documents to public.documents.
  * Called after account linking and again when an order is created.
+ * Each member may carry multiple documents (idDocuments); legacy single
+ * documentUrl members are handled as a one-item list.
  */
 export async function syncMemberDocumentsToDatabase(
   admin: SupabaseClient<Database>,
@@ -106,45 +108,59 @@ export async function syncMemberDocumentsToDatabase(
 ): Promise<void> {
   for (let index = 0; index < members.length; index++) {
     const member = members[index]
-    const url = member.documentUrl?.trim()
-    if (!url) continue
+    const baseSlotKey = member.slotKey || `member_${index}_passport`
 
-    const slotKey = member.slotKey || `member_${index}_passport`
-    const fileName = member.documentFileName || 'identity-document'
-    const publicId = derivePublicId(url, slotKey, member.documentPublicId)
+    const docs = (member.idDocuments?.length
+      ? member.idDocuments
+      : member.documentUrl
+        ? [{
+            url: member.documentUrl,
+            publicId: member.documentPublicId ?? '',
+            fileName: member.documentFileName ?? '',
+            slotKey: baseSlotKey,
+          }]
+        : []
+    ).filter(d => d.url?.trim())
 
-    if (orderId) {
-      await admin
-        .from('documents')
-        .update({ superseded_at: new Date().toISOString() })
-        .eq('order_id', orderId)
-        .eq('slot_key', slotKey)
-        .is('superseded_at', null)
-    } else {
-      await admin
-        .from('documents')
-        .update({ superseded_at: new Date().toISOString() })
-        .eq('profile_id', profileId)
-        .eq('slot_key', slotKey)
-        .is('order_id', null)
-        .is('superseded_at', null)
-    }
+    for (const doc of docs) {
+      const url = doc.url.trim()
+      const slotKey = doc.slotKey || baseSlotKey
+      const fileName = doc.fileName || 'identity-document'
+      const publicId = derivePublicId(url, slotKey, doc.publicId)
 
-    const { error } = await admin.from('documents').insert({
-      profile_id: profileId,
-      order_id: orderId,
-      document_type: 'identity',
-      storage_type: inferStorageType(url),
-      file_name: fileName,
-      url,
-      public_id: publicId,
-      slot_key: slotKey,
-      mime_type: inferMimeType(fileName),
-      uploaded_at: new Date().toISOString(),
-    })
+      if (orderId) {
+        await admin
+          .from('documents')
+          .update({ superseded_at: new Date().toISOString() })
+          .eq('order_id', orderId)
+          .eq('slot_key', slotKey)
+          .is('superseded_at', null)
+      } else {
+        await admin
+          .from('documents')
+          .update({ superseded_at: new Date().toISOString() })
+          .eq('profile_id', profileId)
+          .eq('slot_key', slotKey)
+          .is('order_id', null)
+          .is('superseded_at', null)
+      }
 
-    if (error) {
-      console.error(`[syncMemberDocuments] insert failed for ${slotKey}:`, error)
+      const { error } = await admin.from('documents').insert({
+        profile_id: profileId,
+        order_id: orderId,
+        document_type: 'identity',
+        storage_type: inferStorageType(url),
+        file_name: fileName,
+        url,
+        public_id: publicId,
+        slot_key: slotKey,
+        mime_type: inferMimeType(fileName),
+        uploaded_at: new Date().toISOString(),
+      })
+
+      if (error) {
+        console.error(`[syncMemberDocuments] insert failed for ${slotKey}:`, error)
+      }
     }
   }
 }

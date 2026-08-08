@@ -39,6 +39,7 @@ function MemberCard({
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(member.name);
+  const [editPhone, setEditPhone] = useState(member.phone ?? '');
   const [editAddress, setEditAddress] = useState(
     [member.address, member.city, member.state, member.country].filter(Boolean).join(', ')
   );
@@ -62,6 +63,7 @@ function MemberCard({
     setSaving(true); setSaveError(null);
     const res = await updateOrderMemberAt(orderId, member.index, {
       fullName: editName.trim(),
+      phone: editPhone.trim(),
       address: editAddress.trim(),
       ssnItin: editSsn.trim(),
     });
@@ -118,6 +120,10 @@ function MemberCard({
             <input className={INPUT} value={editName} onChange={e => setEditName(e.target.value)} />
           </div>
           <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-inter mb-1 block">WhatsApp Number</label>
+            <input className={INPUT} value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="+1 555 0100" />
+          </div>
+          <div>
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-inter mb-1 block">Address</label>
             <input className={INPUT} value={editAddress} onChange={e => setEditAddress(e.target.value)} />
           </div>
@@ -140,6 +146,7 @@ function MemberCard({
       ) : (
         /* Info rows */
         <div className="space-y-1.5 mb-4">
+          <InfoRow label="WhatsApp" value={member.phone || '—'} />
           <InfoRow label="Address" value={fullAddress || '—'} />
           <InfoRow label="SSN / ITIN" value={member.ssnItin || '—'} />
         </div>
@@ -151,16 +158,34 @@ function MemberCard({
         <input ref={uploadRef} type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
           onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ''; }} />
 
-        {member.idDocId ? (
-          <div className="flex items-center gap-2 flex-wrap">
-            <a href={`/api/documents/${member.idDocId}/view`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#34088f]/5 text-[#34088f] rounded-full text-xs font-semibold hover:bg-[#34088f]/10 transition-colors">
-              <Eye className="w-3 h-3" /> View ID
-            </a>
-            <a href={`/api/documents/${member.idDocId}/view?download=1`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-50 transition-colors">
-              <Download className="w-3 h-3" /> Download
-            </a>
+        {member.idDocs.length > 0 ? (
+          <div className="space-y-2">
+            {member.idDocs.map((doc, di) => (
+              <div key={doc.id ?? doc.url ?? di} className="flex items-center gap-2 flex-wrap">
+                {member.idDocs.length > 1 && (
+                  <span className="text-[10px] font-bold text-gray-400 font-inter w-8 flex-shrink-0">
+                    ID {di + 1}
+                  </span>
+                )}
+                {doc.id ? (
+                  <>
+                    <a href={`/api/documents/${doc.id}/view`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#34088f]/5 text-[#34088f] rounded-full text-xs font-semibold hover:bg-[#34088f]/10 transition-colors">
+                      <Eye className="w-3 h-3" /> View ID
+                    </a>
+                    <a href={`/api/documents/${doc.id}/view?download=1`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-50 transition-colors">
+                      <Download className="w-3 h-3" /> Download
+                    </a>
+                  </>
+                ) : doc.url ? (
+                  <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#34088f]/5 text-[#34088f] rounded-full text-xs font-semibold hover:bg-[#34088f]/10 transition-colors">
+                    <Eye className="w-3 h-3" /> View ID
+                  </a>
+                ) : null}
+              </div>
+            ))}
             <button onClick={() => uploadRef.current?.click()} disabled={uploading}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors">
               {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />} Replace
@@ -196,6 +221,7 @@ export function MembersTab({ order, adminId, onSaved }: MembersTabProps) {
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [newSsn, setNewSsn] = useState('');
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
@@ -208,7 +234,7 @@ export function MembersTab({ order, adminId, onSaved }: MembersTabProps) {
   const handleAddMember = async () => {
     if (!newName.trim()) { setAddError('Full name is required'); return; }
     setAdding(true); setAddError(null);
-    const res = await addOrderMember(order.id, { fullName: newName.trim(), address: newAddress.trim(), ssnItin: newSsn.trim() });
+    const res = await addOrderMember(order.id, { fullName: newName.trim(), phone: newPhone.trim(), address: newAddress.trim(), ssnItin: newSsn.trim() });
     if (!res.success) { setAdding(false); setAddError(res.error ?? 'Failed to add member'); return; }
 
     // Upload doc if provided
@@ -218,7 +244,7 @@ export function MembersTab({ order, adminId, onSaved }: MembersTabProps) {
     }
 
     setAdding(false);
-    setNewName(''); setNewAddress(''); setNewSsn(''); setNewDocFile(null);
+    setNewName(''); setNewPhone(''); setNewAddress(''); setNewSsn(''); setNewDocFile(null);
     setShowAddForm(false);
     onSaved();
   };
@@ -260,6 +286,10 @@ export function MembersTab({ order, adminId, onSaved }: MembersTabProps) {
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-inter mb-1 block">Full Name *</label>
               <input className={INPUT} value={newName} onChange={e => setNewName(e.target.value)} placeholder="John Doe" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-inter mb-1 block">WhatsApp Number</label>
+              <input className={INPUT} value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="+1 555 0100" />
             </div>
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider font-inter mb-1 block">SSN / ITIN</label>

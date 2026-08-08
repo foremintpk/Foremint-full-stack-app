@@ -34,12 +34,24 @@ export function ReviewMembersCard({
             </p>
             <ReviewRow label="Full Name" value={member.fullName} />
             <ReviewRow
+              label="WhatsApp"
+              value={
+                member.phoneNumber
+                  ? `${member.phoneCountryCode ?? ''} ${member.phoneNumber}`.trim()
+                  : 'N/A'
+              }
+            />
+            <ReviewRow
               label="Address"
               value={member.addressLine1 || 'N/A'}
             />
             <ReviewRow
-              label="Document"
-              value={member.documentFileName ?? 'Not uploaded'}
+              label={(member.idDocuments?.length ?? 0) > 1 ? 'Documents' : 'Document'}
+              value={
+                member.idDocuments?.length
+                  ? member.idDocuments.map(d => d.fileName || 'Document').join(', ')
+                  : member.documentFileName ?? 'Not uploaded'
+              }
             />
           </div>
         ))

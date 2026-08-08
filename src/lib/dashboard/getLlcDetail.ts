@@ -228,17 +228,46 @@ async function fetchLlcDetailQuery(
         ? documents.find(d => d.url === snapshotUrl && d.isActive !== false)
         : undefined);
 
+    // All identity documents (multi-upload); legacy single doc as fallback.
+    const snapshotDocs: any[] = Array.isArray(m.idDocuments) ? m.idDocuments : [];
+    let idDocs = snapshotDocs
+      .filter((sd: any) => sd?.url)
+      .map((sd: any) => {
+        const rec = documents.find(
+          d => (d.slotKey === sd.slotKey || d.url === sd.url) && d.isActive !== false
+        );
+        return {
+          id: rec?.id ?? null,
+          url: rec?.url ?? sd.url ?? null,
+          fileName: rec?.fileName ?? sd.fileName ?? null,
+        };
+      });
+    if (idDocs.length === 0 && (activeDoc || snapshotUrl)) {
+      idDocs = [{
+        id: activeDoc?.id ?? null,
+        url: activeDoc?.url ?? snapshotUrl,
+        fileName: activeDoc?.fileName ?? m.documentFileName ?? null,
+      }];
+    }
+
+    const phone =
+      m.phoneCountryCode && m.phoneNumber
+        ? `${m.phoneCountryCode} ${m.phoneNumber}`.trim()
+        : m.phoneNumber || m.phone || null;
+
     return {
       index: idx,
       position: m.position || 'Founder',
       name: m.fullName || m.name || 'Unnamed Member',
+      phone,
       address: m.addressLine1 || m.address || '',
       city: m.city || '',
       state: m.state || '',
       country: m.country || '',
       ssnItin: m.ssnItin || m.ssn || m.itin || null,
-      idDocId: activeDoc?.id ?? null,
-      idDocUrl: activeDoc?.url ?? snapshotUrl,
+      idDocs,
+      idDocId: idDocs[0]?.id ?? activeDoc?.id ?? null,
+      idDocUrl: idDocs[0]?.url ?? activeDoc?.url ?? snapshotUrl,
       hasResubmitRequest,
     };
   });

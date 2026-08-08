@@ -150,6 +150,36 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
           ? documents.find(d => d.url === snapshotUrl && d.isActive !== false)
           : undefined);
 
+      // All identity documents for this member (multi-upload); falls back to
+      // the legacy single document for older snapshots.
+      const snapshotDocs = Array.isArray(m.idDocuments)
+        ? (m.idDocuments as Array<Record<string, unknown>>)
+        : [];
+      let idDocs = snapshotDocs
+        .filter(sd => sd?.url)
+        .map(sd => {
+          const rec = documents.find(
+            d => (d.slotKey === sd.slotKey || d.url === sd.url) && d.isActive !== false
+          );
+          return {
+            id: rec?.id ?? null,
+            url: rec?.url ?? (sd.url as string) ?? null,
+            fileName: rec?.fileName ?? (sd.fileName as string) ?? null,
+          };
+        });
+      if (idDocs.length === 0 && (activeDoc || snapshotUrl)) {
+        idDocs = [{
+          id: activeDoc?.id ?? null,
+          url: activeDoc?.url ?? snapshotUrl,
+          fileName: activeDoc?.fileName ?? (m.documentFileName as string) ?? null,
+        }];
+      }
+
+      const phone =
+        (m.phoneCountryCode as string) && (m.phoneNumber as string)
+          ? `${m.phoneCountryCode} ${m.phoneNumber}`.trim()
+          : (m.phoneNumber as string) || (m.phone as string) || null;
+
       const addressLine =
         (m.addressLine1 as string) ??
         (m.address as string) ??
@@ -159,13 +189,15 @@ export async function getOrderDetail(orderId: string): Promise<OrderDetail | nul
         index: idx,
         position: (m.position as string) ?? 'Founder',
         name: (m.fullName as string) ?? (m.name as string) ?? 'Unnamed Member',
+        phone,
         address: addressLine,
         city: (m.city as string) ?? '',
         state: (m.state as string) ?? '',
         country: (m.country as string) ?? '',
         ssnItin: (m.ssnItin as string) ?? (m.ssn as string) ?? null,
-        idDocId: activeDoc?.id ?? null,
-        idDocUrl: activeDoc?.url ?? snapshotUrl,
+        idDocs,
+        idDocId: idDocs[0]?.id ?? activeDoc?.id ?? null,
+        idDocUrl: idDocs[0]?.url ?? activeDoc?.url ?? snapshotUrl,
         hasResubmitRequest,
       };
     });
