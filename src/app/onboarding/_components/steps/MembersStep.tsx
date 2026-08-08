@@ -15,7 +15,7 @@ function createMember(index: number, isMultiMember: boolean): OnboardingMember {
   return {
     id: generateUuid(),
     fullName: '',
-    phoneCountryCode: '+1',
+    phoneCountryCode: '+92',
     phoneNumber: '',
     addressLine1: '',
     addressLine2: '',

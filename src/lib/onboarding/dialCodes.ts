@@ -10,8 +10,8 @@ export interface DialCode {
 // Note: option values must be unique — countries sharing a dial code
 // (US/Canada +1) are merged into a single entry.
 export const DIAL_CODES: DialCode[] = [
-  { country: 'United States / Canada', code: '+1', iso: 'US' },
   { country: 'Pakistan',             code: '+92',  iso: 'PK' },
+  { country: 'United States / Canada', code: '+1', iso: 'US' },
   { country: 'United Kingdom',       code: '+44',  iso: 'GB' },
   { country: 'United Arab Emirates', code: '+971', iso: 'AE' },
   { country: 'Australia',            code: '+61',  iso: 'AU' },

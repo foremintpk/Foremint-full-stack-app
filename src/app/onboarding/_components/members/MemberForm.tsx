@@ -59,9 +59,9 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
           </label>
           <div className="flex gap-2 min-w-0">
             <select
-              value={member.phoneCountryCode || '+1'}
+              value={member.phoneCountryCode || '+92'}
               onChange={e => onChange({ phoneCountryCode: e.target.value })}
-              className="w-[104px] flex-shrink-0 bg-white border border-gray-200 rounded-lg pl-3 pr-1 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#34088f]/25 focus:border-[#34088f] transition-colors"
+              className="w-[92px] flex-shrink-0 bg-white border border-gray-200 rounded-lg pl-2.5 pr-2.5 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#34088f]/25 focus:border-[#34088f] transition-colors"
               aria-label="Country code"
             >
               {DIAL_CODES.map(dc => (

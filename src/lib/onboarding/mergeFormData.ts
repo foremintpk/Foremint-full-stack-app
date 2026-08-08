@@ -62,7 +62,7 @@ function normalizeMember(raw: Record<string, unknown>, index: number): Onboardin
   return {
     id: String(raw.id ?? generateUuid()),
     fullName: String(raw.fullName ?? raw.name ?? ''),
-    phoneCountryCode: String(raw.phoneCountryCode ?? '+1'),
+    phoneCountryCode: String(raw.phoneCountryCode ?? '+92'),
     phoneNumber: String(raw.phoneNumber ?? ''),
     addressLine1: String(raw.addressLine1 ?? raw.address ?? ''),
     addressLine2: String(raw.addressLine2 ?? ''),
