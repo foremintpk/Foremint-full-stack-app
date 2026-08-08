@@ -61,12 +61,13 @@ export function MemberForm({ member, showPosition, onChange }: MemberFormProps) 
             <select
               value={member.phoneCountryCode || '+92'}
               onChange={e => onChange({ phoneCountryCode: e.target.value })}
-              className="w-[92px] flex-shrink-0 bg-white border border-gray-200 rounded-lg pl-2.5 pr-2.5 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#34088f]/25 focus:border-[#34088f] transition-colors"
+              className="w-[80px] flex-shrink-0 appearance-none bg-white border border-gray-200 rounded-lg pl-2.5 pr-7 py-3 text-sm text-gray-900 bg-no-repeat bg-[right_0.625rem_center] focus:outline-none focus:ring-2 focus:ring-[#34088f]/25 focus:border-[#34088f] transition-colors"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")` }}
               aria-label="Country code"
             >
               {DIAL_CODES.map(dc => (
                 <option key={dc.iso} value={dc.code}>
-                  {dc.iso} {dc.code}
+                  {dc.code}
                 </option>
               ))}
             </select>
