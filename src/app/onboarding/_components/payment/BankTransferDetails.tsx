@@ -8,31 +8,31 @@ interface BankTransferDetailsProps {
   businessName: string
 }
 
-const GBP_DETAILS = [
-  ['Company Name', 'ForeMint Solutions LLC'],
-  ['Account No', '56338534'],
-  ['Sort Code', '185008'],
-  ['IBAN', 'GB57CITI18500856338534'],
-  ['BIC', 'CITIGB2L'],
-  ['Bank Name', 'Citibank'],
-  ['Bank Address', 'Canada Square, Canary Wharf London, E14 5LB United Kingdom'],
-]
+// const GBP_DETAILS = [
+//   ['Company Name', 'ForeMint Solutions LLC'],
+//   ['Account No', '56338534'],
+//   ['Sort Code', '185008'],
+//   ['IBAN', 'GB57CITI18500856338534'],
+//   ['BIC', 'CITIGB2L'],
+//   ['Bank Name', 'Citibank'],
+//   ['Bank Address', 'Canada Square, Canary Wharf London, E14 5LB United Kingdom'],
+// ]
 
 const USD_DETAILS = [
   ['Company Name', 'ForeMint Solutions LLC'],
-  ['Account No', '70583100002355954'],
-  ['Account Type', 'CHECKING'],
-  ['Routing (ABA)', '031100209'],
-  ['SWIFT Code', 'CITIUS33'],
-  ['Bank Name', 'Citibank'],
-  ['Bank Address', '111 Wall Street New York, NY 10043 USA'],
+  ['Account Number', '16704799'],
+  ['IBAN', 'GB33CLRB04281216704799'],
+  ['SWIFT/BIC', 'CLRBGB22XXX'],
+  ['Sort Code', '042812'],
+  ['Bank Name', 'Clear Bank'],
+  ['Bank Address', '133 Houndsditch, LONDON, EC3A 7BX'],
 ]
 
 const PK_DETAILS = [
-  ['Account Title', 'Pakistani payment details placeholder'],
-  ['Account No', 'To be added'],
-  ['IBAN', 'To be added'],
-  ['Bank Name', 'To be added'],
+  ['Account Title', 'ForeMint'],
+  ['Account No', '2369385556044'],
+  ['IBAN', 'PK03UNIL0109000385556044'],
+  ['Bank Name', ' United Bank Limited (UBL)'],
 ]
 
 export function BankTransferDetails({ amount, businessName }: BankTransferDetailsProps) {
@@ -53,11 +53,12 @@ export function BankTransferDetails({ amount, businessName }: BankTransferDetail
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <BankDetailCard title="GBP Bank Details" rows={GBP_DETAILS} />
+        {/* <BankDetailCard title="GBP Bank Details" rows={GBP_DETAILS} /> */}
         <BankDetailCard title="USD Bank Details" rows={USD_DETAILS} />
-        <div className="lg:col-span-2">
-          <BankDetailCard title="Pakistani Payment Details" rows={PK_DETAILS} />
-        </div>
+        <BankDetailCard title="Pakistani Payment Details" rows={PK_DETAILS} />
+        {/* <div className="lg:col-span-2">
+          
+        </div> */}
       </div>
     </div>
   )
