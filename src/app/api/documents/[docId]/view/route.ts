@@ -86,52 +86,90 @@ export async function GET(
     const fileName = (doc.file_name as string) || 'document';
     const isPdf = mimeType === 'application/pdf';
 
-    let upstreamUrl: string | null = null;
+    // Candidate upstream URLs, tried in order. Cloudinary splits assets across
+    // /image/upload, /raw/upload and /video/upload; asking the wrong one 404s.
+    let candidateUrls: string[] = [];
 
     if (storageType === 'cloudinary' && publicId) {
       // Build a signed Cloudinary URL server-side only — never redirect to it.
       // The URL is used purely to fetch bytes here on the server.
-      const resourceType: string = (doc.cloudinary_resource_type as string | null) || 'image';
+      const buildCloudinaryUrl = (resourceType: string) => {
+        const urlOptions: Record<string, any> = {
+          resource_type: resourceType,
+          sign_url: true,
+          secure: true,
+          type: 'upload',
+        };
 
-      const urlOptions: Record<string, any> = {
-        resource_type: resourceType,
-        sign_url: true,
-        secure: true,
-        type: 'upload',
+        // Cloudinary raw PDFs need format=pdf to be served correctly when resource_type is image
+        if (resourceType === 'image' && isPdf) {
+          urlOptions.format = 'pdf';
+        }
+
+        return cloudinary.url(publicId, urlOptions);
       };
 
-      // Cloudinary raw PDFs need format=pdf to be served correctly when resource_type is image
-      if (resourceType === 'image' && isPdf) {
-        urlOptions.format = 'pdf';
-      }
+      // Rows written before the resource type was recorded correctly have a NULL
+      // (or plain wrong) column, so fall back to what the mime type implies:
+      // uploads go through resource_type:'auto', which files everything that is
+      // not an image or video under 'raw'. PDFs are handled as image derivatives.
+      const inferredResourceType = mimeType.startsWith('image/') || isPdf
+        ? 'image'
+        : mimeType.startsWith('video/')
+          ? 'video'
+          : 'raw';
 
-      upstreamUrl = cloudinary.url(publicId, urlOptions);
+      const primary = (doc.cloudinary_resource_type as string | null) || inferredResourceType;
+      // If the stored type still disagrees with where the bytes actually live,
+      // try the other buckets before giving up rather than surfacing a 502.
+      const fallbacks = ['raw', 'image', 'video'].filter((t) => t !== primary);
+
+      candidateUrls = [primary, ...fallbacks].map(buildCloudinaryUrl);
     } else {
       // Supabase Storage
       const signedSupabaseUrl = await getSignedSupabaseStorageUrl(storagePath, adminSdk);
-      upstreamUrl = signedSupabaseUrl || (doc.url as string | null);
+      const supabaseUrl = signedSupabaseUrl || (doc.url as string | null);
+      if (supabaseUrl) candidateUrls = [supabaseUrl];
     }
 
-    if (!upstreamUrl) {
+    if (candidateUrls.length === 0) {
       return NextResponse.json({ error: 'Document URL not available' }, { status: 500 });
     }
 
     // Proxy bytes through our server — the client sees only /api/documents/{id}/view
-    const fileRes = await fetch(upstreamUrl, { cache: 'no-store' });
-    if (!fileRes.ok) {
+    let fileRes: Response | null = null;
+    let lastStatus = 502;
+
+    for (const candidateUrl of candidateUrls) {
+      const res = await fetch(candidateUrl, { cache: 'no-store' });
+      if (res.ok) {
+        fileRes = res;
+        break;
+      }
+      lastStatus = res.status;
+    }
+
+    if (!fileRes) {
       return NextResponse.json(
-        { error: `Upstream fetch failed: ${fileRes.status}` },
+        { error: `Upstream fetch failed: ${lastStatus}` },
         { status: 502 }
       );
     }
 
     const bytes = await fileRes.arrayBuffer();
 
+    // File names come from user uploads. Quotes, backslashes or non-ASCII
+    // characters produce an invalid header value, so send a sanitised ASCII
+    // name plus the RFC 5987 form browsers prefer when present.
+    const asciiFileName = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '');
+
     return new NextResponse(bytes, {
       status: 200,
       headers: {
         'Content-Type': mimeType,
-        'Content-Disposition': `${isDownload ? 'attachment' : 'inline'}; filename="${fileName}"`,
+        'Content-Disposition':
+          `${isDownload ? 'attachment' : 'inline'}; filename="${asciiFileName}"; ` +
+          `filename*=UTF-8''${encodeURIComponent(fileName)}`,
         'Cache-Control': 'private, no-store',
       },
     });

@@ -721,3 +721,15 @@ END $$;
 NOTIFY pgrst, 'reload schema';
 
 
+
+-- Backfill: non-PDF uploads (Word, Excel, …) were recorded as 'image' even though
+-- Cloudinary's resource_type:'auto' files them under 'raw'. The signed URL built by
+-- /api/documents/[docId]/view then pointed at /image/upload and 404'd. Trust the
+-- stored delivery URL, which is Cloudinary's own secure_url.
+UPDATE public.documents
+SET cloudinary_resource_type = 'raw'
+WHERE storage_type = 'cloudinary'
+  AND url LIKE '%/raw/upload/%'
+  AND cloudinary_resource_type IS DISTINCT FROM 'raw';
+
+NOTIFY pgrst, 'reload schema';
