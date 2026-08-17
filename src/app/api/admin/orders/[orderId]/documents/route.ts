@@ -134,7 +134,12 @@ export async function POST(
     if (slotKey === 'payment_receipt') docType = 'payment_receipt';
 
     // 6. Insert new document record
-    const cloudinaryResourceType = isPdfFile ? 'raw' : 'image';
+    // Record what Cloudinary actually stored rather than guessing from isPdfFile.
+    // With resource_type:'auto' anything that isn't an image/video lands in 'raw'
+    // (Word, Excel, ZIP …); recording 'image' for those makes the view route sign
+    // a /image/upload URL for bytes that live under /raw/upload, which 404s.
+    const cloudinaryResourceType =
+      (uploadResult.resource_type as string | undefined) || (isPdfFile ? 'raw' : 'image');
 
     const { data: docRecord, error: insertError } = await (supabase as any)
       .from('documents')
