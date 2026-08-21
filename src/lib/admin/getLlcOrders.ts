@@ -99,9 +99,11 @@ async function fetchLlcOrders(
       if (term) {
         const like = `%${term}%`;
 
-        // Client name/email live on `profiles`. PostgREST cannot OR a joined
-        // table's columns against the parent's, so resolve them to user ids
-        // first and fold those into the same OR group.
+        // The account profile name and the name captured on the order form
+        // drift apart constantly (90 of 111 live LLC orders disagree), so both
+        // have to be searchable. form_snapshot fields are columns of `orders`
+        // and go straight into the OR; `profiles` is a joined table, which
+        // PostgREST cannot OR against the parent, so resolve it to user ids.
         const { data: profileMatches, error: profileError } = await client
           .from('profiles')
           .select('id')
@@ -115,6 +117,8 @@ async function fetchLlcOrders(
         const clauses = [
           `order_number.ilike.${like}`,
           `form_snapshot->>businessName.ilike.${like}`,
+          `form_snapshot->>fullName.ilike.${like}`,
+          `form_snapshot->>email.ilike.${like}`,
         ];
 
         const matchedUserIds = (profileMatches ?? []).map((p) => p.id);
