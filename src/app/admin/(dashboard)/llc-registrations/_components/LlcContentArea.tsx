@@ -9,10 +9,13 @@ interface LlcContentAreaProps {
 }
 
 export default function LlcContentArea({ children }: LlcContentAreaProps): React.JSX.Element {
-  const { isPending } = useLlcNavigation();
+  const { isPending, isSearching } = useLlcNavigation();
 
   return (
     <div className="relative">
+      {/* isPending covers deliberate clicks (pills, date, sort, page size, pagination)
+          and keeps the original blocking overlay. A background search never lands
+          here — it only dims the results below so typing is never interrupted. */}
       {isPending && (
         <div
           aria-busy="true"
@@ -25,7 +28,11 @@ export default function LlcContentArea({ children }: LlcContentAreaProps): React
           </div>
         </div>
       )}
-      <div className={isPending ? 'pointer-events-none select-none' : ''}>
+      <div
+        className={`transition-opacity duration-150 ${
+          isPending ? 'pointer-events-none select-none' : ''
+        } ${isSearching ? 'opacity-60' : 'opacity-100'}`}
+      >
         {children}
       </div>
     </div>

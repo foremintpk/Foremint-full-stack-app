@@ -1,7 +1,8 @@
 /**
  * @file src/lib/admin/getLlcOrders.ts
  * @description Highly optimized LLC registrations list fetcher featuring dual-route caching.
- * Searches bypass the unstable_cache layer and execute directly against full-text tsvector indices.
+ * Searches bypass the unstable_cache layer and run as incremental `ilike` substring
+ * matches, consistent with the other admin lists (addons, users, invoices, paypal).
  *
  * FIX (Next.js 15+): cookies() must NOT be called inside unstable_cache().
  * createClient() is now called OUTSIDE the cache boundary and the client
@@ -16,6 +17,13 @@ import { DATE_RANGES } from './dateRanges';
 import { formatLlcName } from './formatters';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+
+/**
+ * Cap on client-profile matches folded into the order search. Each id adds ~37
+ * characters to the PostgREST query string, so this keeps the request URL well
+ * inside safe limits while still covering any realistic admin lookup.
+ */
+const PROFILE_MATCH_LIMIT = 100;
 
 interface PostgrestOrderRow {
   id: string;
@@ -79,11 +87,43 @@ async function fetchLlcOrders(
       }
     }
 
+    // Incremental substring search, mirroring the addon/user/invoice lists.
+    // The previous `textSearch('search_vector', …)` matched whole tsvector
+    // lexemes only, so "a" / "ab" / "abou" returned nothing and results
+    // appeared only once the complete word ("about") had been typed.
     if (filters.q) {
-      query = query.textSearch('search_vector', filters.q, {
-        config: 'english',
-        type: 'websearch',
-      });
+      // PostgREST parses `or=(…)` as a CSV expression — strip the characters
+      // that would otherwise break out of the filter.
+      const term = filters.q.replace(/[,()"\\]/g, ' ').trim();
+
+      if (term) {
+        const like = `%${term}%`;
+
+        // Client name/email live on `profiles`. PostgREST cannot OR a joined
+        // table's columns against the parent's, so resolve them to user ids
+        // first and fold those into the same OR group.
+        const { data: profileMatches, error: profileError } = await client
+          .from('profiles')
+          .select('id')
+          .or(`full_name.ilike.${like},email.ilike.${like}`)
+          .limit(PROFILE_MATCH_LIMIT);
+
+        if (profileError) {
+          console.error('Error resolving client name matches:', profileError);
+        }
+
+        const clauses = [
+          `order_number.ilike.${like}`,
+          `form_snapshot->>businessName.ilike.${like}`,
+        ];
+
+        const matchedUserIds = (profileMatches ?? []).map((p) => p.id);
+        if (matchedUserIds.length > 0) {
+          clauses.push(`user_id.in.(${matchedUserIds.join(',')})`);
+        }
+
+        query = query.or(clauses.join(','));
+      }
     }
 
     query = query

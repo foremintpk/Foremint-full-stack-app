@@ -5,8 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, useRef } from 'react';
 import { LlcListFilters } from '@/types/admin';
 import { DATE_RANGES } from '@/lib/admin/dateRanges';
 import { useLlcNavigation } from '@/context/llc-navigation-context';
@@ -18,41 +17,48 @@ interface LlcListControlsProps {
 export default function LlcListControls({
   filters,
 }: LlcListControlsProps): React.JSX.Element {
-  const searchParams = useSearchParams();
-  const { isPending, navigate } = useLlcNavigation();
+  const { isPending, isSearching, navigate } = useLlcNavigation();
 
   const [searchTerm, setSearchTerm] = useState(filters.q);
-  const [isDebouncing, setIsDebouncing] = useState(false);
 
-  // Sync state if q filter in URL updates externally
+  // Last value we actually pushed to the URL. Lets us tell an external URL
+  // change (e.g. the "Clear all filters" link) apart from our own round-trip,
+  // so a returning server response can never overwrite what is being typed.
+  const lastSubmittedRef = useRef(filters.q);
+
+  // Adopt an externally changed q, but only while the input is settled.
   useEffect(() => {
-    setSearchTerm(filters.q);
+    setSearchTerm((current) => {
+      if (filters.q === lastSubmittedRef.current) return current;
+      if (current.trim() !== lastSubmittedRef.current) return current; // mid-typing, leave alone
+      lastSubmittedRef.current = filters.q;
+      return filters.q;
+    });
   }, [filters.q]);
 
-  // Search input debouncer (350ms)
+  // Search input debouncer (300ms). Runs as a background navigation, so the
+  // input is never disabled and typing is never interrupted.
   useEffect(() => {
-    if (searchTerm === filters.q) {
-      setIsDebouncing(false);
-      return;
-    }
+    const trimmed = searchTerm.trim();
+    if (trimmed === lastSubmittedRef.current) return;
 
-    setIsDebouncing(true);
     const handler = setTimeout(() => {
+      lastSubmittedRef.current = trimmed;
+
       const params = new URLSearchParams(window.location.search);
-      if (searchTerm.trim()) {
-        params.set('q', searchTerm.trim());
+      if (trimmed) {
+        params.set('q', trimmed);
       } else {
         params.delete('q');
       }
       params.set('page', '1');
-      navigate(`/admin/llc-registrations?${params.toString()}`);
-      setIsDebouncing(false);
-    }, 350);
+      navigate(`/admin/llc-registrations?${params.toString()}`, { background: true });
+    }, 300);
 
     return () => {
       clearTimeout(handler);
     };
-  }, [searchTerm, filters.q, navigate]);
+  }, [searchTerm, navigate]);
 
   // Load pagesize preference from sessionStorage on client mount
   useEffect(() => {
@@ -141,13 +147,12 @@ export default function LlcListControls({
           aria-label="Search orders"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          disabled={isPending && !isDebouncing}
           placeholder="Search by client name or LLC name..."
-          className="block w-full h-10 pl-10 pr-10 border border-[#e5e7eb] rounded-full bg-white text-sm text-[#111111] placeholder-[#9ca3af] outline-none focus:border-[#34088f] transition-all font-inter disabled:opacity-60 disabled:bg-gray-50"
+          className="block w-full h-10 pl-10 pr-10 border border-[#e5e7eb] rounded-full bg-white text-sm text-[#111111] placeholder-[#9ca3af] outline-none focus:border-[#34088f] transition-all font-inter"
         />
         {/* Loading Spinner or Clear Action Button */}
         <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-          {isDebouncing ? (
+          {isSearching ? (
             <svg
               className="animate-spin h-4 w-4 text-[#34088f]"
               xmlns="http://www.w3.org/2000/svg"
@@ -169,12 +174,11 @@ export default function LlcListControls({
               />
             </svg>
           ) : (
-            (searchTerm || isPending) && (
+            searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
                 aria-label="Clear search"
-                disabled={isPending}
-                className="text-[#9ca3af] hover:text-[#111111] transition-colors disabled:opacity-50"
+                className="text-[#9ca3af] hover:text-[#111111] transition-colors"
               >
                 <svg
                   className="h-4 w-4"
