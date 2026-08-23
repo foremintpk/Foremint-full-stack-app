@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { revalidateTag, revalidatePath } from 'next/cache';
+import { revalidateTag, revalidatePath, updateTag } from 'next/cache';
 import type { BlogStatus, BlogFaq } from '@/types/admin';
 import {
   slugify,
@@ -14,6 +14,11 @@ import {
   stripHtml,
 } from '@/lib/blog/content';
 import { generateBlogHtmlFromJson } from '@/lib/blog/render';
+import {
+  resolvePublishTimestamps,
+  validatePublishState,
+  needsPublishRepair,
+} from '@/lib/blog/publishState';
 
 // ── Auth helper ───────────────────────────────────────────────────────────────
 
@@ -168,7 +173,12 @@ function parseBlogFormData(formData: FormData) {
   const categoryIds = formData.getAll('categoryIds').map(v => String(v)).filter(Boolean);
   const categoryId = categoryIds[0] ?? null;
   const status = (formData.get('status') as BlogStatus | null) ?? 'draft';
+  // Absolute ISO instant. The client converts the tz-less `datetime-local`
+  // value using the browser's IANA zone before submitting.
   const publishDate = get('publishDate') || null;
+  // Set only by the explicit "Publish Now" correction action — never by a
+  // normal save, which must preserve publication history.
+  const republish = formData.get('republish') === 'true';
 
   const contentHtmlRaw = (formData.get('contentHtml') as string | null) ?? '';
   let contentJson: Record<string, unknown> | null = null;
@@ -204,7 +214,7 @@ function parseBlogFormData(formData: FormData) {
   const metaDescription = metaDescriptionRaw || (excerpt ? generateMetaDescription(contentHtml) || excerpt : null);
 
   return {
-    title, slugRaw, author, categoryId, categoryIds, status, publishDate,
+    title, slugRaw, author, categoryId, categoryIds, status, publishDate, republish,
     contentHtml, contentJson, toc, plainText,
     excerpt, featuredImageUrl, featuredImageAlt, isFeatured,
     metaTitle, metaDescription, focusKeyword, canonicalUrl,
@@ -217,16 +227,11 @@ type ParsedBlog = ReturnType<typeof parseBlogFormData>;
 function validateBlog(parsed: ParsedBlog): string | null {
   if (!parsed.title) return 'Title is required';
   if (!parsed.plainText.trim()) return 'Content is required';
-  if (parsed.status === 'scheduled') {
-    if (!parsed.publishDate) return 'A publish date is required for scheduled posts';
-    if (new Date(parsed.publishDate).getTime() <= Date.now()) {
-      return 'Scheduled publish date must be in the future';
-    }
-  }
-  if (parsed.publishDate && Number.isNaN(new Date(parsed.publishDate).getTime())) {
-    return 'Invalid publish date';
-  }
-  return null;
+  return validatePublishState({
+    status: parsed.status,
+    publishDate: parsed.publishDate,
+    now: new Date(),
+  });
 }
 
 /** Replace a post's category set in the many-to-many junction table. */
@@ -286,8 +291,16 @@ export async function createBlogPost(formData: FormData): Promise<{ error?: stri
     const baseSlug = slugify(parsed.slugRaw || parsed.title);
     const slug = await ensureUniqueSlug(adminSdk, 'blog_posts', baseSlug);
 
-    const now = new Date().toISOString();
-    const publishedAt = parsed.status === 'published' ? (parsed.publishDate ?? now) : null;
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    // Server clock is authoritative for the actual publication timestamp.
+    const resolved = resolvePublishTimestamps({
+      status: parsed.status,
+      publishDate: parsed.publishDate,
+      existingPublishedAt: null,
+      now: nowDate,
+    });
+    const publishedAt = resolved.publishedAt;
 
     const structuredData = buildStructuredData({
       title: parsed.title, slug, excerpt: parsed.excerpt, author: parsed.author,
@@ -307,7 +320,7 @@ export async function createBlogPost(formData: FormData): Promise<{ error?: stri
         category_id: parsed.categoryId,
         status: parsed.status,
         is_featured: parsed.isFeatured,
-        publish_date: parsed.publishDate,
+        publish_date: resolved.publishDate,
         content: parsed.plainText,
         content_html: parsed.contentHtml,
         content_json: parsed.contentJson,
@@ -372,13 +385,27 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<{ 
       ? await ensureUniqueSlug(adminSdk, 'blog_posts', baseSlug, id)
       : existing.slug;
 
-    const now = new Date().toISOString();
-    const wasPublished = existing.status === 'published';
-    const isPublishing = parsed.status === 'published' && !wasPublished;
-    const publishedAt = parsed.status === 'published'
-      ? (existing.published_at ?? parsed.publishDate ?? now)
-      : existing.published_at ?? null;
-    const publishedBy = isPublishing ? userId : (existing.published_by ?? null);
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    // Repairing an invalid published-but-future row counts as an explicit
+    // republish even if the client did not flag it, so the fix is reachable.
+    const republish = parsed.republish || (
+      parsed.status === 'published' &&
+      needsPublishRepair(
+        { status: existing.status as BlogStatus, publishedAt: existing.published_at as string | null },
+        nowDate,
+      )
+    );
+    // Normal edits (title/content/SEO/tags/…) must never move published_at.
+    const resolved = resolvePublishTimestamps({
+      status: parsed.status,
+      publishDate: parsed.publishDate,
+      existingPublishedAt: (existing.published_at as string | null) ?? null,
+      republish,
+      now: nowDate,
+    });
+    const publishedAt = resolved.publishedAt;
+    const publishedBy = resolved.isPublishing ? userId : (existing.published_by ?? null);
 
     const structuredData = buildStructuredData({
       title: parsed.title, slug, excerpt: parsed.excerpt, author: parsed.author,
@@ -398,7 +425,7 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<{ 
         category_id: parsed.categoryId,
         status: parsed.status,
         is_featured: parsed.isFeatured,
-        publish_date: parsed.publishDate,
+        publish_date: resolved.publishDate,
         content: parsed.plainText,
         content_html: parsed.contentHtml,
         content_json: parsed.contentJson,
@@ -430,6 +457,54 @@ export async function updateBlogPost(id: string, formData: FormData): Promise<{ 
     revalidateTag('blog-list', 'max');
     revalidateTag('blog-categories', 'max');
     revalidateTag(`blog-post-${id}`, 'max');
+    revalidatePath('/admin/blogs', 'layout');
+    return {};
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : 'An unexpected error occurred' };
+  }
+}
+
+// ── Publish now (explicit publication-date correction) ────────────────────────
+
+/**
+ * Publish a post immediately, stamping published_at with the server clock.
+ *
+ * This is the *only* path that rewrites an existing published_at, and it exists
+ * so an accidentally future-dated post (status=published, published_at > now —
+ * which the public API correctly hides) can be repaired from the dashboard.
+ * Touches publishing columns only: title, slug, content, SEO, category, tags,
+ * featured image, author and structured data are all left untouched.
+ */
+export async function publishBlogPostNow(id: string): Promise<{ error?: string }> {
+  try {
+    const { userId } = await verifyBlogRole();
+    const adminSdk = createAdminClient();
+
+    const { data: existing } = await (adminSdk as any)
+      .from('blog_posts').select('id, status, published_by').eq('id', id).single();
+    if (!existing) return { error: 'Blog post not found' };
+
+    const now = new Date().toISOString();
+
+    const { error } = await (adminSdk as any)
+      .from('blog_posts')
+      .update({
+        status: 'published',
+        published_at: now,
+        // An immediate publication has no outstanding scheduling request.
+        publish_date: null,
+        published_by: (existing.published_by as string | null) ?? userId,
+        updated_by: userId,
+        updated_at: now,
+      })
+      .eq('id', id);
+
+    if (error) return { error: error.message };
+
+    // Read-your-own-writes: the admin must see the post live immediately after
+    // repairing it, so expire the cache rather than serving stale content.
+    updateTag('blog-list');
+    updateTag(`blog-post-${id}`);
     revalidatePath('/admin/blogs', 'layout');
     return {};
   } catch (err: unknown) {

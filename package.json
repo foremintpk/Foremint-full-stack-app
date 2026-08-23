@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test src/**/*.test.ts",
     "migrate:scan": "tsx migrations/wordpress/migrate.ts scan",
     "migrate:dry": "tsx migrations/wordpress/migrate.ts dry",
     "migrate": "tsx migrations/wordpress/migrate.ts run",
