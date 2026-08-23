@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Plus, Trash2, Loader2, UploadCloud, X, Star, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { createBlogPost, updateBlogPost, createBlogTag } from '@/lib/admin/actions/blogActions';
+import { createBlogPost, updateBlogPost, createBlogTag, publishBlogPostNow } from '@/lib/admin/actions/blogActions';
 import { RichTextEditor, type RichTextValue } from '@/components/editor/RichTextEditor';
 import { slugify } from '@/lib/blog/content';
+import { getBrowserTimeZone, localInputToIso, isoToLocalInput } from '@/lib/datetime';
+import { LocalDateTime } from '@/components/LocalDateTime';
+import { useIsHydrated } from '@/hooks/useIsHydrated';
+import { getEffectivePublishState } from '@/lib/blog/publishState';
 import type { BlogPost, BlogCategory, BlogTag, BlogStatus, BlogFaq } from '@/types/admin';
 
 interface BlogFormProps {
@@ -274,6 +278,87 @@ function TagSelector({
   );
 }
 
+// ── Submit actions ────────────────────────────────────────────────────────────
+
+/**
+ * Save controls, rendered both above and below the form so long posts don't
+ * force a scroll to reach them. Both instances are the same component driven by
+ * the same props, so their enabled/pending state can never diverge.
+ */
+function FormActions({
+  isEdit,
+  isPending,
+  onCancel,
+  onSaveDraft,
+  compact = false,
+}: {
+  isEdit: boolean;
+  isPending: boolean;
+  onCancel: () => void;
+  onSaveDraft: () => void;
+  compact?: boolean;
+}) {
+  const pad = compact ? 'px-4 py-2 text-xs' : 'px-5 py-2.5 text-sm';
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={onCancel}
+        className={`${pad} font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors`}
+      >
+        Cancel
+      </button>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onSaveDraft}
+          disabled={isPending}
+          className={`${pad} font-semibold text-gray-700 bg-white border border-gray-200 hover:border-[#34088f]/40 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2`}
+        >
+          {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save Draft
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className={`${pad} font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-full transition-colors disabled:opacity-50 flex items-center gap-2`}
+        >
+          {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {isEdit ? 'Update Post' : 'Save Post'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Publish date input (browser-timezone aware) ───────────────────────────────
+
+/**
+ * `datetime-local` shows wall-clock time with no zone, so a stored UTC instant
+ * must be converted into the *browser's* zone before prefilling. That conversion
+ * is client-only, so it happens after mount to keep server and client markup
+ * identical during hydration.
+ */
+function PublishDateInput({ value }: { value: string | null }) {
+  const hydrated = useIsHydrated();
+  // null = not yet edited, so mirror the stored value; a string = the admin's
+  // own entry, which then takes precedence.
+  const [edited, setEdited] = useState<string | null>(null);
+
+  // Before hydration the browser zone is unknown, so render empty to keep the
+  // server and client markup identical; afterwards show the stored instant as
+  // local wall-clock time.
+  const stored = hydrated ? isoToLocalInput(value, getBrowserTimeZone()) : '';
+
+  return (
+    <input
+      name="publishDate"
+      type="datetime-local"
+      value={edited ?? stored}
+      onChange={e => setEdited(e.target.value)}
+      className={inputClass}
+    />
+  );
+}
+
 // ── Main form ─────────────────────────────────────────────────────────────────
 
 export function BlogForm({ post, categories, allTags }: BlogFormProps) {
@@ -302,6 +387,26 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
 
   const isEdit = !!post;
 
+  // Detect the invalid "published but published_at is in the future" state so
+  // the admin gets an explicit repair path instead of a silently hidden post.
+  const [repaired, setRepaired] = useState(false);
+  const needsRepair = !repaired && !!post && getEffectivePublishState(post) === 'published_not_live';
+
+  // Ref rather than getElementById: the form's children change as the repair
+  // banner mounts/unmounts, and a stale DOM lookup can miss the live inputs.
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const handlePublishNow = useCallback(() => {
+    if (!post) return;
+    startTransition(async () => {
+      const result = await publishBlogPostNow(post.id);
+      if (result.error) { setError(result.error); toast.error(result.error); return; }
+      toast.success('Post published — it is now live');
+      setRepaired(true);
+      router.refresh();
+    });
+  }, [post, router]);
+
   const onTitleChange = (v: string) => {
     setTitle(v);
     if (!slugTouched) setSlug(slugify(v));
@@ -309,11 +414,25 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
 
   const handleSubmit = useCallback((statusOverride?: BlogStatus) => {
     setError(null);
-    const form = document.getElementById('blog-form') as HTMLFormElement | null;
+    const form = formRef.current;
     if (!form) return;
     const formData = new FormData(form);
 
     if (statusOverride) formData.set('status', statusOverride);
+
+    // Controlled fields are the source of truth — read them from state rather
+    // than relying on what FormData scraped out of the DOM.
+    formData.set('title', title);
+    formData.set('slug', slug);
+
+    // `datetime-local` carries no timezone. Interpret the admin's wall-clock
+    // entry in *their* browser zone and submit an absolute UTC instant, so the
+    // server never has to guess what "20:00" meant.
+    const rawPublishDate = (formData.get('publishDate') as string | null) ?? '';
+    const publishIso = localInputToIso(rawPublishDate, getBrowserTimeZone());
+    if (publishIso) formData.set('publishDate', publishIso);
+    else formData.delete('publishDate');
+
     formData.set('contentHtml', contentRef.current.html);
     formData.set('contentJson', JSON.stringify(contentRef.current.json ?? {}));
     formData.set('featuredImageUrl', featuredImageUrl);
@@ -331,12 +450,49 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
       router.push('/admin/blogs');
       router.refresh();
     });
-  }, [featuredImageUrl, isFeatured, faqs, selectedTagIds, selectedCategoryIds, isEdit, post, router]);
+  }, [title, slug, featuredImageUrl, isFeatured, faqs, selectedTagIds, selectedCategoryIds, isEdit, post, router]);
 
   return (
-    <form id="blog-form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-5 w-full min-w-0 max-w-full">
+    <form ref={formRef} id="blog-form" onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-5 w-full min-w-0 max-w-full">
+      {/* ── Submit actions (top) ── Same component and state as the bottom bar,
+          so long posts can be saved without scrolling to the end. */}
+      <FormActions
+        isEdit={isEdit}
+        isPending={isPending}
+        onCancel={() => router.back()}
+        onSaveDraft={() => handleSubmit('draft')}
+        compact
+      />
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl">{error}</div>
+      )}
+
+      {needsRepair && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-bold">Published — Not Live</p>
+            <p className="text-xs mt-0.5">
+              This post has a future publication time and stays hidden until{' '}
+              <strong>
+                <LocalDateTime
+                  value={post?.publishedAt}
+                  options={{ dateStyle: 'medium', timeStyle: 'short' }}
+                  fallback="its scheduled time"
+                />
+              </strong>.
+              Saving edits will not change that — use Publish Now to make it live immediately.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handlePublishNow}
+            disabled={isPending}
+            className="px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2 flex-shrink-0"
+          >
+            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Publish Now
+          </button>
+        </div>
       )}
 
       {/* ── Section 1: Basic Information ── */}
@@ -365,8 +521,8 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
               {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </Field>
-          <Field label="Publish Date" hint="Required for scheduled posts.">
-            <input name="publishDate" type="datetime-local" defaultValue={post?.publishDate?.slice(0, 16) ?? ''} className={inputClass} />
+          <Field label="Publish Date" hint="Required for scheduled posts. Uses your local timezone.">
+            <PublishDateInput value={post?.publishDate ?? null} />
           </Field>
         </div>
 
@@ -441,19 +597,14 @@ export function BlogForm({ post, categories, allTags }: BlogFormProps) {
         </Field>
       </Card>
 
-      {/* ── Submit actions ── */}
-      <div className="flex items-center justify-between pt-1">
-        <button type="button" onClick={() => router.back()} className="px-5 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors">
-          Cancel
-        </button>
-        <div className="flex gap-3">
-          <button type="button" onClick={() => handleSubmit('draft')} disabled={isPending} className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:border-[#34088f]/40 rounded-full transition-colors disabled:opacity-50 flex items-center gap-2">
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Save Draft
-          </button>
-          <button type="submit" disabled={isPending} className="px-5 py-2.5 text-sm font-semibold text-white bg-[#34088f] hover:bg-[#2a0673] rounded-full transition-colors disabled:opacity-50 flex items-center gap-2">
-            {isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {isEdit ? 'Update Post' : 'Save Post'}
-          </button>
-        </div>
+      {/* ── Submit actions (bottom) ── */}
+      <div className="pt-1">
+        <FormActions
+          isEdit={isEdit}
+          isPending={isPending}
+          onCancel={() => router.back()}
+          onSaveDraft={() => handleSubmit('draft')}
+        />
       </div>
     </form>
   );

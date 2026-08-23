@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Clock, Eye, Edit3, ExternalLink } from 'lucide-react';
 import { BlogStatusBadge } from './BlogStatusBadge';
 import { BlogDeleteButton } from './BlogDeleteButton';
+import { LocalDateTime } from '@/components/LocalDateTime';
+import { getEffectivePublishState } from '@/lib/blog/publishState';
 import type { BlogPost } from '@/types/admin';
 
 interface BlogTableProps {
@@ -37,7 +39,12 @@ export function BlogTable({ posts }: BlogTableProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {posts.map(post => (
+            {posts.map(post => {
+              // What the row *actually* is — a "published" post whose
+              // published_at is still in the future is not live.
+              const effectiveState = getEffectivePublishState(post);
+              const isLive = effectiveState === 'published';
+              return (
               <tr key={post.id} className="hover:bg-gray-50/30 transition-colors group">
                 <td className="px-5 py-4 max-w-[260px]">
                   <p className="text-sm font-semibold text-gray-900 truncate font-manrope">{post.title}</p>
@@ -50,7 +57,26 @@ export function BlogTable({ posts }: BlogTableProps) {
                   <span className="text-xs text-gray-500">{post.categoryName ?? '—'}</span>
                 </td>
                 <td className="px-5 py-4">
-                  <BlogStatusBadge status={post.status} />
+                  <BlogStatusBadge status={effectiveState} />
+                  {effectiveState === 'published_not_live' && (
+                    <p className="text-[10px] text-red-600 mt-1">
+                      Goes live{' '}
+                      <LocalDateTime
+                        value={post.publishedAt}
+                        options={{ dateStyle: 'medium', timeStyle: 'short' }}
+                        fallback=""
+                      />
+                    </p>
+                  )}
+                  {effectiveState === 'scheduled' && post.publishDate && (
+                    <p className="text-[10px] text-blue-600 mt-1">
+                      <LocalDateTime
+                        value={post.publishDate}
+                        options={{ dateStyle: 'medium', timeStyle: 'short' }}
+                        fallback=""
+                      />
+                    </p>
+                  )}
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -59,15 +85,14 @@ export function BlogTable({ posts }: BlogTableProps) {
                   </div>
                 </td>
                 <td className="px-5 py-4">
-                  <span className="text-xs text-gray-500">
-                    {post.publishedAt
-                      ? new Date(post.publishedAt).toLocaleDateString()
-                      : new Date(post.createdAt).toLocaleDateString()}
-                  </span>
+                  <LocalDateTime
+                    value={post.publishedAt ?? post.createdAt}
+                    className="text-xs text-gray-500"
+                  />
                 </td>
                 <td className="px-5 py-4">
                   <div className="flex items-center justify-end gap-1">
-                    {post.status === 'published' && (
+                    {isLive && (
                       <>
                         <a
                           href={`${FRONTEND_BASE}/blog/${post.slug}`}
@@ -101,7 +126,8 @@ export function BlogTable({ posts }: BlogTableProps) {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
