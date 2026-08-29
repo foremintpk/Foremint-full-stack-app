@@ -92,6 +92,17 @@ function getAuthError(error: unknown): ActionResult {
   };
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function getSiteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000")
+  );
+}
+
 // ── Actions ──────────────────────────────────────────────────────────────────
 
 export async function loginAction(
@@ -205,11 +216,7 @@ export async function registerAction(
 
   const supabase = await createClient();
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  const siteUrl = getSiteUrl();
 
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -246,7 +253,7 @@ export async function forgotPasswordAction(
   const supabase = await createClient();
 
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+    redirectTo: `${getSiteUrl()}/auth/callback?next=/reset-password`,
   });
 
   if (error) {
@@ -275,6 +282,21 @@ export async function resetPasswordAction(
 
   const supabase = await createClient();
 
+  // The recovery link must have established a session via /auth/callback.
+  // Without this check updateUser would silently target the wrong user
+  // (or fail confusingly) when the link was never redeemed.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error:
+        "Your password reset link is invalid or has expired. Please request a new one.",
+    };
+  }
+
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
@@ -283,8 +305,23 @@ export async function resetPasswordAction(
     return { success: false, error: error.message };
   }
 
+  let destination = "/dashboard";
+  try {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.role) {
+      destination = getRoleRedirect(profile.role);
+    }
+  } catch {
+    destination = "/dashboard";
+  }
+
   revalidatePath("/", "layout");
-  redirect("/dashboard");
+  redirect(destination as Route);
 }
 
 export async function logoutAction(): Promise<void> {
