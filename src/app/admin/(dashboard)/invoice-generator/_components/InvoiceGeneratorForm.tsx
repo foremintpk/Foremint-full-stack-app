@@ -51,6 +51,8 @@ import {
   todayIso,
   type CustomAddon,
   type InvoiceInput,
+  resolveServiceType,
+  serviceTypeApplies,
 } from '@/lib/services/invoice/invoice';
 import InvoiceList, { type StoredInvoice } from './InvoiceList';
 
@@ -176,6 +178,11 @@ export default function InvoiceGeneratorForm() {
       includeCompliance,
     ],
   );
+
+  // What the Service Type row will actually print — chosen for a formation,
+  // derived for an ITIN, empty for a renewal. Same helper the PDF uses, so the
+  // preview cannot drift from the document.
+  const resolvedServiceType = resolveServiceType(input);
 
   // Selecting a state pulls in its filing fee, unless it was typed over.
   useEffect(() => {
@@ -449,20 +456,25 @@ export default function InvoiceGeneratorForm() {
                 </div>
               </Field>
 
-              <Field>
-                <label className={label}>Service type</label>
-                <select
-                  className={field}
-                  value={serviceType}
-                  onChange={(e) => setServiceType(e.target.value)}
-                >
-                  {SERVICE_TYPES.map((s) => (
-                    <option key={s} value={s}>
-                      {expand(s, input)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {/* Only a formation invoice lets the operator pick this. An ITIN
+                  names its own service and a renewal prints no service row, so
+                  the dropdown would only offer inapplicable formation wording. */}
+              {serviceTypeApplies(orderType) && (
+                <Field>
+                  <label className={label}>Service type</label>
+                  <select
+                    className={field}
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
+                  >
+                    {SERVICE_TYPES.map((s) => (
+                      <option key={s} value={s}>
+                        {expand(s, input)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               <Field>
                 <label className={label}>Invoice by</label>
@@ -828,12 +840,14 @@ export default function InvoiceGeneratorForm() {
                 <dt className="text-slate-500">Invoice no</dt>
                 <dd className="font-semibold text-[#33088f]">{invoiceNo}</dd>
               </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-slate-500">Service</dt>
-                <dd className="truncate text-right font-medium text-slate-700">
-                  {expand(serviceType, input)}
-                </dd>
-              </div>
+              {resolvedServiceType && (
+                <div className="flex justify-between gap-3">
+                  <dt className="text-slate-500">Service</dt>
+                  <dd className="truncate text-right font-medium text-slate-700">
+                    {expand(resolvedServiceType, input)}
+                  </dd>
+                </div>
+              )}
             </dl>
 
             <ul className="mb-4 space-y-1.5 border-y border-slate-100 py-3 text-xs">

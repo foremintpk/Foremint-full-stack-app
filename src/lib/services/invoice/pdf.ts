@@ -34,7 +34,7 @@ import {
   findState,
   itinTermsApply,
   mainTermsApply,
-  serviceTypeApplies,
+  resolveServiceType,
   findStatusLabel,
   fmtLong,
   fmtShort,
@@ -414,13 +414,14 @@ function drawInvoicePage(doc: PDFDocument, fonts: Fonts, logo: never, input: Inv
   const labelOpts: TextOpts = { size: SIZE.metaLabel, font: fonts.semibold, color: PURPLE };
   const valueOpts: TextOpts = { size: SIZE.metaValue, font: fonts.regular, color: INK };
   const metaValueMaxW = STATUS.x - META_VALUE_X - 10;
-  // Service Type is a formation field; a renewal or standalone ITIN is already
-  // described by its order type, so the row is dropped rather than left blank.
+  // Service Type is chosen by hand only on a formation invoice. An ITIN names
+  // its own service, and a renewal resolves to empty, which drops the row.
+  const serviceLine = resolveServiceType(input);
   const meta: [string, string][] = [
     ['Invoice Date', formatInvoiceDate(input.invoiceDate)],
     ['Invoice No', input.invoiceNo],
-    ...(serviceTypeApplies(input.orderType) && input.serviceType.trim()
-      ? ([['Service Type', expand(input.serviceType, input)]] as [string, string][])
+    ...(serviceLine
+      ? ([['Service Type', expand(serviceLine, input)]] as [string, string][])
       : []),
     ['Invoice By', input.invoiceBy],
   ];

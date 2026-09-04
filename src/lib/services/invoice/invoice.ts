@@ -308,11 +308,30 @@ export const mainTermsApply = (input: InvoiceInput): boolean =>
   !(input.orderType === 'itin' && itinTermsApply(input));
 
 /**
- * Service Type is a formation-specific field — the dropdown lists things like
- * "{ST}- Company Formation". A renewal or a standalone ITIN is described by its
- * order type instead, so the row is left off those invoices entirely.
+ * Whether the operator picks the Service Type by hand. The dropdown lists
+ * formation wording ("{ST}- Company Formation"), which does not describe a
+ * renewal or a standalone ITIN, so the field is hidden on those and the line is
+ * derived from the order type instead — see resolveServiceType.
  */
 export const serviceTypeApplies = (orderType: string): boolean => orderType === 'llc';
+
+/**
+ * The Service Type line as it prints.
+ *
+ * An ITIN invoice still names the service it is charging for; it just is not
+ * the operator's choice, so it is filled in from the order type rather than
+ * left to a dropdown that only offers formation wording. A renewal returns
+ * empty, which drops the row — the renewal terms and the compliance page
+ * already say what it covers.
+ */
+export function resolveServiceType(input: {
+  orderType: string;
+  serviceType: string;
+}): string {
+  if (serviceTypeApplies(input.orderType)) return input.serviceType.trim();
+  if (input.orderType === 'itin') return '{ST}- ITIN Application';
+  return '';
+}
 
 /** Page 2 is the annual-compliance sheet, which an ITIN invoice has no use for. */
 export const compliancePageDefault = (orderType: string): boolean => orderType !== 'itin';
