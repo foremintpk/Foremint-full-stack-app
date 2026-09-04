@@ -6,6 +6,7 @@ import { updateFormationInfo } from '@/lib/admin/actions/updateFormationInfo';
 import { updateFormationDetails } from '@/lib/admin/actions/updateFormationDetails';
 import { US_STATES } from '@/lib/onboarding-data';
 import type { OrderDetail, Package } from '@/types/admin';
+import ExtractFromDocuments from '../ExtractFromDocuments';
 
 interface FormationDetailsTabProps {
   order: OrderDetail;
@@ -182,6 +183,9 @@ export function FormationDetailsTab({
 
   return (
     <div className="space-y-5">
+      {/* Reads this order's documents and proposes values for the fields below. */}
+      <ExtractFromDocuments orderNumber={order.orderNumber} />
+
       {/* ── Business Information ──────────────────────────────────── */}
       <SectionCard title="Business Information" icon={Info}>
         <div className="flex items-center justify-between mb-5">

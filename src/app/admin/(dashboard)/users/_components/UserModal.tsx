@@ -179,6 +179,7 @@ export function UserModal({ mode, user, onClose }: UserModalProps): React.JSX.El
                 <option value="customer">Customer</option>
                 <option value="b2b_customer">B2B Customer</option>
                 <option value="manager">Manager</option>
+                <option value="account_manager">Account Manager</option>
                 <option value="administrator">Administrator</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">

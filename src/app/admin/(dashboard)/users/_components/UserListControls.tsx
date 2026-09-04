@@ -94,6 +94,7 @@ export function UserListControls({ filters }: UserListControlsProps): React.JSX.
             <option value="all">All Roles</option>
             <option value="administrator">Administrator</option>
             <option value="manager">Manager</option>
+                <option value="account_manager">Account Manager</option>
             <option value="customer">Customer</option>
             <option value="b2b_customer">B2B Customer</option>
           </select>

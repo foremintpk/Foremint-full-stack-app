@@ -73,7 +73,7 @@ export async function createClientNotification(
   try {
     const supabase = await createClient();
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -174,7 +174,7 @@ export async function deleteClientNotification(
   try {
     const supabase = await createClient();
     const { data: role } = await supabase.rpc('get_my_role');
-    if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
+    if (role !== 'administrator' && role !== 'manager' && role !== 'account_manager') return { success: false, error: 'Unauthorized' };
 
     const admin = createAdminClient();
 
@@ -256,7 +256,7 @@ export async function toggleClientNotificationStatus(
   try {
     const supabase = await createClient();
     const { data: role } = await supabase.rpc('get_my_role');
-    if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
+    if (role !== 'administrator' && role !== 'manager' && role !== 'account_manager') return { success: false, error: 'Unauthorized' };
 
     const admin = createAdminClient();
 

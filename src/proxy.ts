@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMiddlewareClient } from "@/lib/supabase/middleware";
+import {
+  canAccessSection,
+  isStaffRole,
+  landingPathForRole,
+  sectionForPath,
+} from "@/lib/auth/permissions";
 import type { Database } from "@/types/database";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
@@ -32,7 +38,7 @@ function matchesRoute(pathname: string, routes: string[]): boolean {
 }
 
 function isAdminRole(role: UserRole | null): boolean {
-  return role === "administrator" || role === "manager";
+  return isStaffRole(role);
 }
 
 /**
@@ -165,6 +171,27 @@ export async function proxy(request: NextRequest) {
     if (!isAdminRole(userRole)) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/dashboard";
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
+    }
+
+    // Section-level gate. A role that cannot open this area is sent to its own
+    // landing page rather than shown a page it has no rows for. Pages re-check
+    // server-side; this only avoids rendering something the role cannot use.
+    const section = sectionForPath(pathname);
+    if (section && !canAccessSection(userRole, section)) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = landingPathForRole(userRole);
+      const redirectRes = NextResponse.redirect(redirectUrl);
+      response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
+      return redirectRes;
+    }
+
+    // Bare /admin lands each role somewhere it can actually work.
+    if (pathname === "/admin" || pathname === "/admin/") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = landingPathForRole(userRole);
       const redirectRes = NextResponse.redirect(redirectUrl);
       response.cookies.getAll().forEach((c) => redirectRes.cookies.set(c));
       return redirectRes;

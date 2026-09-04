@@ -176,7 +176,8 @@ export function DocumentsSection({
  <div className="min-w-0 flex-1 pr-4">
  <p className="text-xs font-bold text-gray-900 truncate">{latestDoc.fileName}</p>
  <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
- Size: {formatSize(latestDoc.fileSize)} • Uploaded at {new Date(latestDoc.uploadedAt).toLocaleDateString()}
+ Size: {formatSize(latestDoc.fileSize)} • Uploaded at {/* locale-dependent: identical value, formatted per client */}
+                <span suppressHydrationWarning>{new Date(latestDoc.uploadedAt).toLocaleDateString()}</span>
  </p>
  </div>
  <div className="flex items-center gap-1.5 shrink-0">
@@ -233,7 +234,8 @@ export function DocumentsSection({
  {doc.fileName}
  </p>
  <p className="text-[8px] text-gray-400 mt-0.5">
- Superseded at {new Date(doc.supersededAt || '').toLocaleDateString()}
+ Superseded at {/* locale-dependent: identical value, formatted per client */}
+                <span suppressHydrationWarning>{new Date(doc.supersededAt || '').toLocaleDateString()}</span>
  </p>
  </div>
  <div className="flex items-center gap-1">

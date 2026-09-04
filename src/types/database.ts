@@ -1921,7 +1921,12 @@ export type Database = {
         | "cancelled"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
-      user_role: "administrator" | "manager" | "customer" | "b2b_customer"
+      user_role:
+        | "administrator"
+        | "manager"
+        | "account_manager"
+        | "customer"
+        | "b2b_customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2092,7 +2097,13 @@ export const Constants = {
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],
       storage_provider: ["supabase", "cloudinary"],
-      user_role: ["administrator", "manager", "customer", "b2b_customer"],
+      user_role: [
+        "administrator",
+        "manager",
+        "account_manager",
+        "customer",
+        "b2b_customer",
+      ],
     },
   },
 } as const

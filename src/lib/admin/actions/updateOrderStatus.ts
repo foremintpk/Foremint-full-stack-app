@@ -22,7 +22,7 @@ export async function updateOrderStatus(
 
     // FIX 1: Retrieve user role via RPC call to prevent infinite RLS recursion
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized: Admin role required' };
     }
 

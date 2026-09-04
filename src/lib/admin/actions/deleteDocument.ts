@@ -21,7 +21,7 @@ export async function deleteDocument(
 
     // Only administrators may delete documents
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || role !== 'administrator') {
+    if (roleError || (role !== 'administrator' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized: Administrator role required' };
     }
 

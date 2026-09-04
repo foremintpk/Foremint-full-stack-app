@@ -12,11 +12,13 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin';
+import { AdminProfile, AdminRole, BadgeCounts, SafeAdminNotification } from '@/types/admin';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminScrollLock } from './AdminScrollLock';
 import { LlcNameProvider } from '@/context/llc-name-context';
+import { BatchJobProvider } from '@/context/batch-job-context';
+import { BatchJobBanner } from './BatchJobBanner';
 import { AdminBadgeContext } from '@/context/admin-badge-context';
 import { RealtimeProvider, useRealtime } from '@/components/realtime/RealtimeProvider';
 import { getAdminBadgeCounts } from '@/lib/admin/actions/getAdminBadgeCounts';
@@ -39,6 +41,19 @@ function AdminShellInner({
   initialLlcNames,
   children,
 }: AdminShellProps) {
+  // AdminProfile.role is the wider UserRole even though only admin roles reach
+  // this shell. Narrow it here rather than casting, so an unexpected role gets
+  // the least-privileged nav rather than an administrator's.
+  // AdminProfile.role is the wider UserRole even though only staff roles reach
+  // this shell. Narrow it here rather than casting, so an unexpected role gets
+  // the least-privileged nav rather than an administrator's.
+  const navRole: AdminRole =
+    adminProfile.role === 'administrator'
+      ? 'administrator'
+      : adminProfile.role === 'account_manager'
+        ? 'account_manager'
+        : 'manager';
+
   const [liveBadges, setLiveBadges] = useState<BadgeCounts>(badgeCounts);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   useRefreshOrchestrator(); // 60 s full-page reconciliation
@@ -148,12 +163,15 @@ function AdminShellInner({
 
   return (
     <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>
+      {/* Mounted here, above the routed page, so a batch run survives the
+          operator navigating to another admin screen mid-run. */}
+      <BatchJobProvider>
       <LlcNameProvider initialNames={initialLlcNames}>
         <AdminScrollLock />
         <div className="flex h-screen w-full overflow-hidden bg-gray-50 font-inter">
           {/* Desktop Sidebar */}
           <div className="hidden lg:relative lg:flex lg:flex-shrink-0 lg:overflow-visible">
-            <AdminSidebar badgeCounts={liveBadges} />
+            <AdminSidebar badgeCounts={liveBadges} role={navRole} />
           </div>
 
           {/* Mobile Navigation Drawer Overlay */}
@@ -173,7 +191,7 @@ function AdminShellInner({
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                  <AdminSidebar badgeCounts={liveBadges} />
+                  <AdminSidebar badgeCounts={liveBadges} role={navRole} />
                 </div>
               </div>
               <div className="absolute inset-0 left-64 h-full w-full" onClick={handleMobileToggle} />
@@ -195,6 +213,8 @@ function AdminShellInner({
           </div>
         </div>
       </LlcNameProvider>
+      <BatchJobBanner />
+      </BatchJobProvider>
     </AdminBadgeContext.Provider>
   );
 }

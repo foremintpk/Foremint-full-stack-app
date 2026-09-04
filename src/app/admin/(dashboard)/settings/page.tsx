@@ -5,7 +5,10 @@ import { SettingsProfileCard } from './_components/SettingsProfileCard';
 import { SettingsEmailForm } from './_components/SettingsEmailForm';
 import { SettingsPasswordForm } from './_components/SettingsPasswordForm';
 import { SettingsDangerZone } from './_components/SettingsDangerZone';
+import { SettingsApiKeyForm } from './_components/SettingsApiKeyForm';
+import { getSs4Settings, toPublicSettings } from '@/lib/services/ss4/settings';
 import { ShieldAlert } from 'lucide-react';
+import { isStaffRole } from '@/lib/auth/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +21,10 @@ export default async function SettingsPage() {
   }
 
   // Access control check: Only "administrator" role is allowed
-  if (profile.role !== 'administrator') {
+  // Every staff role reaches this page: it is entirely self-service — own
+  // profile, own email, own password, and signing out of all sessions. Nothing
+  // here touches another user or any system-wide setting.
+  if (!isStaffRole(profile.role)) {
     return (
       <div className="flex items-center justify-center py-12 px-4 font-inter">
         <div className="w-full max-w-md p-8 bg-white border border-[#e0d9f7] rounded-2xl shadow-[0_1px_4px_rgba(52,8,143,0.06)] text-center space-y-6">
@@ -28,7 +34,7 @@ export default async function SettingsPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-bold font-manrope text-gray-900">Access Denied</h2>
             <p className="text-sm text-gray-500 font-inter leading-relaxed">
-              Settings are restricted to Administrator accounts only. Your current account has the role of{' '}
+              Settings are restricted to staff accounts. Your current account has the role of{' '}
               <span className="font-semibold text-gray-700 capitalize select-text">{profile.role}</span>.
             </p>
           </div>
@@ -40,6 +46,11 @@ export default async function SettingsPage() {
     );
   }
 
+  // The API key is system-wide, so only administrators see or change it — the
+  // rest of this page is self-service and open to every staff role.
+  const isAdministrator = profile.role === 'administrator';
+  const ss4 = isAdministrator ? toPublicSettings(await getSs4Settings()) : null;
+
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 pb-12 select-text font-inter">
       {/* Page Header */}
@@ -48,7 +59,7 @@ export default async function SettingsPage() {
           Settings
         </h1>
         <p className="text-xs font-semibold text-gray-500 font-inter">
-          Manage your admin account credentials and sessions.
+          Manage your account credentials, sessions and integration keys.
         </p>
       </div>
 
@@ -60,6 +71,15 @@ export default async function SettingsPage() {
 
       {/* Password form */}
       <SettingsPasswordForm userId={profile.id} />
+
+      {/* Document-reading API key — administrators only */}
+      {ss4 && (
+        <SettingsApiKeyForm
+          hasKey={ss4.hasVisionKey}
+          keyHint={ss4.visionKeyHint}
+          model={ss4.visionModel}
+        />
+      )}
 
       {/* Danger Zone */}
       <SettingsDangerZone />

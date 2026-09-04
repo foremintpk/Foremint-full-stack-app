@@ -85,7 +85,21 @@ export async function createUser(formData: FormData): Promise<{ error?: string }
       return { error: profileError.message };
     }
 
-    // 3. Revalidate
+    // 3. Sync a new staff account with the team's read state.
+    // Without this every order in the book shows a NEW badge on their first
+    // login — 125 of them today — which reads as noise rather than signal.
+    // Orders nobody has opened yet stay NEW for everyone.
+    if (role === 'administrator' || role === 'manager' || role === 'account_manager') {
+      const { error: backfillError } = await adminClient.rpc('backfill_admin_order_views', {
+        p_admin_id: authData.user.id,
+      });
+      // Cosmetic only — a failure here must not undo an otherwise-created user.
+      if (backfillError) {
+        console.error(`[users] could not sync order views for ${email}: ${backfillError.message}`);
+      }
+    }
+
+    // 4. Revalidate
     revalidateTag('user-list', 'max');
     revalidatePathTyped('/admin/users', 'page');
     revalidatePathTyped('/admin', 'layout');

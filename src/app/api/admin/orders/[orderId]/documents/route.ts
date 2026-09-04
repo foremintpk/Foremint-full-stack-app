@@ -33,7 +33,7 @@ export async function POST(
 
     // 1. Only administrators may upload documents
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || role !== 'administrator') {
+    if (roleError || (role !== 'administrator' && role !== 'account_manager')) {
       return NextResponse.json({ error: 'Forbidden: Administrator role required' }, { status: 403 });
     }
 

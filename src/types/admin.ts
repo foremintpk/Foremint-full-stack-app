@@ -8,7 +8,7 @@
  * 4. Revalidation / Cache Busting: N/A.
  */
 
-export type AdminRole = 'administrator' | 'manager'
+export type AdminRole = 'administrator' | 'manager' | 'account_manager'
 
 export interface AdminProfile {
   id: string
@@ -38,6 +38,11 @@ export interface NavItem {
   href: string
   icon: string
   badgeKey?: keyof BadgeCounts
+  /**
+   * Roles allowed to see this item. Omitted means every admin role, which is
+   * the behaviour every existing item relies on.
+   */
+  roles?: AdminRole[]
 }
 
 export interface BadgeCounts {
@@ -409,7 +414,12 @@ export interface Package {
 
 // ─── Users Management System (Chunk 4G) ──────────────────────────────────────────
 
-export type UserRole = 'administrator' | 'manager' | 'customer' | 'b2b_customer'
+export type UserRole =
+  | 'administrator'
+  | 'manager'
+  | 'account_manager'
+  | 'customer'
+  | 'b2b_customer'
 
 export interface AdminUser {
   id: string

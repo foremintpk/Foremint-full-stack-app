@@ -19,7 +19,7 @@ export async function deleteLlcOrder(
 
     // 1. Enforce admin/manager role
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized: Admin or Manager role required' };
     }
 
