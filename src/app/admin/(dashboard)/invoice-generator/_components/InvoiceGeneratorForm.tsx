@@ -53,6 +53,10 @@ import {
   type InvoiceInput,
   resolveServiceType,
   serviceTypeApplies,
+  stateAndPackageApply,
+  packagePriceFor,
+  stateFeeFor,
+  compliancePageDefault,
 } from '@/lib/services/invoice/invoice';
 import InvoiceList, { type StoredInvoice } from './InvoiceList';
 
@@ -184,15 +188,32 @@ export default function InvoiceGeneratorForm() {
   // preview cannot drift from the document.
   const resolvedServiceType = resolveServiceType(input);
 
-  // Selecting a state pulls in its filing fee, unless it was typed over.
+  // Selecting a state pulls in its fee, unless it was typed over. Which fee
+  // depends on the order type: a formation pays the one-time filing fee, a
+  // renewal pays that state's recurring annual report fee.
   useEffect(() => {
-    if (!filingFeeTouched) setFilingFee(String(findState(stateCode).fee));
-  }, [stateCode, filingFeeTouched]);
+    if (!filingFeeTouched) setFilingFee(String(stateFeeFor(orderType, stateCode)));
+  }, [stateCode, orderType, filingFeeTouched]);
 
-  // Same for the package price.
+  // Same for the package price, which is cheaper on a renewal.
   useEffect(() => {
-    if (!packagePriceTouched) setPackagePrice(String(findPackage(packageId).price));
-  }, [packageId, packagePriceTouched]);
+    if (!packagePriceTouched) setPackagePrice(String(packagePriceFor(orderType, packageId)));
+  }, [packageId, orderType, packagePriceTouched]);
+
+  // Switching order type re-applies that type's defaults. Page 2 is the
+  // annual-compliance sheet, which a standalone ITIN has no use for; selecting
+  // ITIN also ticks the ITIN add-on, since it is the entire charge.
+  const lastOrderType = useRef(orderType);
+  useEffect(() => {
+    if (lastOrderType.current === orderType) return;
+    lastOrderType.current = orderType;
+
+    setIncludeCompliance(compliancePageDefault(orderType));
+
+    if (orderType === 'itin') {
+      setAddonIds((prev) => (prev.includes(ITIN_ADDON_ID) ? prev : [...prev, ITIN_ADDON_ID]));
+    }
+  }, [orderType]);
 
   // Payment terms keep following the form until the user edits them.
   const autoTerms = defaultPaymentTerms(input);
@@ -419,20 +440,25 @@ export default function InvoiceGeneratorForm() {
                 </select>
               </Field>
 
-              <Field>
-                <label className={label}>State</label>
-                <select
-                  className={field}
-                  value={stateCode}
-                  onChange={(e) => setStateCode(e.target.value)}
-                >
-                  {STATES.map((s) => (
-                    <option key={s.stateCode} value={s.stateCode}>
-                      {s.stateName} ({s.stateCode}) — ${s.fee}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+              {/* A standalone ITIN is a federal application — no state is
+                  filed with, so the field would only invite a wrong choice. */}
+              {stateAndPackageApply(orderType) && (
+                <Field>
+                  <label className={label}>State</label>
+                  <select
+                    className={field}
+                    value={stateCode}
+                    onChange={(e) => setStateCode(e.target.value)}
+                  >
+                    {STATES.map((s) => (
+                      <option key={s.stateCode} value={s.stateCode}>
+                        {s.stateName} ({s.stateCode}) — $
+                        {stateFeeFor(orderType, s.stateCode)}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
               <Field>
                 <label className={label}>Invoice no</label>
@@ -509,8 +535,15 @@ export default function InvoiceGeneratorForm() {
           </Section>
 
           {/* ------------------------------------------------- pricing */}
+          {/* An ITIN invoice sells no package and pays no state fee; the ITIN
+              add-on below is the whole charge. */}
+          {stateAndPackageApply(orderType) && (
           <Section
-            title="Package & state filing fee"
+            title={
+              orderType === 'renewal'
+                ? 'Package & state annual report fee'
+                : 'Package & state filing fee'
+            }
             hint="These print as two separate lines in the description table."
           >
             <div className="grid gap-4 sm:grid-cols-3">
@@ -526,7 +559,7 @@ export default function InvoiceGeneratorForm() {
                 >
                   {PACKAGES.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — ${p.price}
+                      {p.name} — ${packagePriceFor(orderType, p.id)}
                     </option>
                   ))}
                 </select>
@@ -548,7 +581,10 @@ export default function InvoiceGeneratorForm() {
               </Field>
 
               <Field>
-                <label className={label}>{state.stateName} filing fee ($)</label>
+                <label className={label}>
+                  {state.stateName}{' '}
+                  {orderType === 'renewal' ? 'annual report fee' : 'filing fee'} ($)
+                </label>
                 <input
                   type="number"
                   min={0}
@@ -563,6 +599,7 @@ export default function InvoiceGeneratorForm() {
               </Field>
             </div>
           </Section>
+          )}
 
           {/* -------------------------------------------------- add-ons */}
           <Section

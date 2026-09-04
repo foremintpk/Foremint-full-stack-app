@@ -87,11 +87,33 @@ export const PACKAGES: PackageOption[] = [
 
 export const DEFAULT_PACKAGE = 'standard';
 
+/**
+ * Package prices that differ by order type. A renewal is a smaller engagement
+ * than a formation, so it carries its own rates; anything not listed here bills
+ * at the PACKAGES price above.
+ */
+export const PACKAGE_PRICE_BY_ORDER_TYPE: Record<string, Record<string, number>> = {
+  renewal: { standard: 85, advanced: 100 },
+};
+
 /** Description text of the package line. {ST} {STATE} {PACKAGE} are replaced. */
 export const PACKAGE_LINE_LABEL = '{ST} {PACKAGE} company formation package plan';
 
+/** Package line wording per order type; falls back to PACKAGE_LINE_LABEL. */
+export const PACKAGE_LINE_LABEL_BY_ORDER_TYPE: Record<string, string> = {
+  renewal: '{ST} {PACKAGE} annual renewal package plan',
+};
+
 /** Description text of the state filing fee line. */
 export const FILING_FEE_LINE_LABEL = '{STATE} State Filing Fee';
+
+/**
+ * State fee line wording per order type. A renewal is not paying to file the
+ * company, it is paying the recurring report fee, so it is named as such.
+ */
+export const FILING_FEE_LINE_LABEL_BY_ORDER_TYPE: Record<string, string> = {
+  renewal: '{STATE} State Annual Report Fee',
+};
 
 /* -------------------------------------------------------------------------
    4. ADD-ONS  -  add or delete rows freely.

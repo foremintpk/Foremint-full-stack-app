@@ -13,9 +13,12 @@ import {
   DISCOUNT_NOTE_FALLBACK,
   DISCOUNT_NOTE_LABEL,
   FILING_FEE_LINE_LABEL,
+  FILING_FEE_LINE_LABEL_BY_ORDER_TYPE,
   ORDER_TYPES,
   PACKAGES,
   PACKAGE_LINE_LABEL,
+  PACKAGE_LINE_LABEL_BY_ORDER_TYPE,
+  PACKAGE_PRICE_BY_ORDER_TYPE,
   PAYMENT_STATUSES,
   PAYMENT_TERMS,
   STATES,
@@ -224,24 +227,33 @@ export const newCustomAddonId = () =>
 export function buildLineItems(input: InvoiceInput): LineItem[] {
   const items: LineItem[] = [];
 
-  // 1. the package, carrying the selected state in its description
-  const packagePrice = round2(input.packagePrice);
-  items.push({
-    description: expand(PACKAGE_LINE_LABEL, input),
-    qty: 1,
-    rate: packagePrice,
-    amount: packagePrice,
-  });
-
-  // 2. the state filing fee, as its own line
-  const filingFee = round2(input.filingFee);
-  if (filingFee > 0) {
+  // 1 & 2. the package and the state fee. A standalone ITIN sells neither —
+  //         it is a federal application with no state and no formation package,
+  //         so both lines are left off and the ITIN add-on carries the charge.
+  if (stateAndPackageApply(input.orderType)) {
+    const packagePrice = round2(input.packagePrice);
     items.push({
-      description: expand(FILING_FEE_LINE_LABEL, input),
+      description: expand(
+        PACKAGE_LINE_LABEL_BY_ORDER_TYPE[input.orderType] ?? PACKAGE_LINE_LABEL,
+        input,
+      ),
       qty: 1,
-      rate: filingFee,
-      amount: filingFee,
+      rate: packagePrice,
+      amount: packagePrice,
     });
+
+    const filingFee = round2(input.filingFee);
+    if (filingFee > 0) {
+      items.push({
+        description: expand(
+          FILING_FEE_LINE_LABEL_BY_ORDER_TYPE[input.orderType] ?? FILING_FEE_LINE_LABEL,
+          input,
+        ),
+        qty: 1,
+        rate: filingFee,
+        amount: filingFee,
+      });
+    }
   }
 
   // 3. every ticked add-on, preset or custom, in the order it was ticked.
@@ -335,6 +347,35 @@ export function resolveServiceType(input: {
 
 /** Page 2 is the annual-compliance sheet, which an ITIN invoice has no use for. */
 export const compliancePageDefault = (orderType: string): boolean => orderType !== 'itin';
+
+/**
+ * Whether the invoice charges for a state and a package at all.
+ *
+ * A standalone ITIN is a federal application: no state is filed with, no
+ * formation package is sold, and no state fee is due. The whole charge is the
+ * ITIN add-on, so those sections are hidden and left out of the total.
+ */
+export const stateAndPackageApply = (orderType: string): boolean => orderType !== 'itin';
+
+/** The package price for an order type, honouring any per-type override. */
+export function packagePriceFor(orderType: string, packageId: string): number {
+  const override = PACKAGE_PRICE_BY_ORDER_TYPE[orderType]?.[packageId];
+  return override ?? findPackage(packageId).price;
+}
+
+/**
+ * The state fee this invoice should charge.
+ *
+ * A formation pays the one-time filing fee; a renewal pays the recurring annual
+ * report fee, which is a different number in every state and the reason both
+ * live in the same source of truth. An ITIN pays neither.
+ */
+export function stateFeeFor(orderType: string, stateCode: string): number {
+  if (!stateAndPackageApply(orderType)) return 0;
+  const fees = getStateFee(stateCode);
+  if (!fees) return 0;
+  return orderType === 'renewal' ? fees.renewalFee : fees.fee;
+}
 
 /**
  * Second terms block, worked out from the ITIN add-on price: a fixed advance,
