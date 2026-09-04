@@ -62,7 +62,9 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
       setError('Total Uses must be -1 (unlimited) or a positive integer (e.g. 100)')
       return
     }
-    if (!isValidUsageLimit(perUserUsesVal)) {
+    // When "single use per customer" is on, per-user uses is forced to 1 below,
+    // so the field's own value is irrelevant.
+    if (!singleUsePerCustomer && !isValidUsageLimit(perUserUsesVal)) {
       setError('Per User must be -1 (unlimited) or a positive integer (e.g. 1)')
       return
     }
@@ -72,6 +74,11 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
     }
 
     const formData = new FormData(formRef.current)
+    // A disabled input is omitted from FormData, so when "single use per
+    // customer" is on we have to set the per-user value ourselves.
+    if (singleUsePerCustomer) {
+      formData.set('perUserUses', '1')
+    }
     // The state checkboxes live outside the form's native fields when the
     // restriction is off, so set them explicitly.
     formData.delete('allowedStates')
@@ -232,7 +239,7 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
                   disabled={isPending || singleUsePerCustomer}
                   placeholder="-1"
                   className={`w-full rounded-full border px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f] disabled:bg-gray-50 ${
-                    perUserUsesVal && !isValidUsageLimit(perUserUsesVal)
+                    !singleUsePerCustomer && perUserUsesVal && !isValidUsageLimit(perUserUsesVal)
                       ? 'border-red-400 bg-red-50'
                       : 'border-[#e0d9f7]'
                   }`}
