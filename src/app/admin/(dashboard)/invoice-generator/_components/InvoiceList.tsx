@@ -102,9 +102,14 @@ export default function InvoiceList({ onEdit, refreshToken }: InvoiceListProps):
     if (expanded && !loaded) void load();
   }, [expanded, loaded, load]);
 
+  // A new invoice always lands in the list, and the list opens itself to show
+  // it — otherwise generating appears to do nothing until the section is
+  // expanded by hand, which reads as "it did not save".
   useEffect(() => {
-    if (refreshToken > 0 && loaded) void load();
-  }, [refreshToken, loaded, load]);
+    if (refreshToken === 0) return;
+    setExpanded(true);
+    void load();
+  }, [refreshToken, load]);
 
   useEffect(() => {
     if (editingName) nameInputRef.current?.select();

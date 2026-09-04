@@ -3,12 +3,37 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { STATE_FEES } from '@/lib/onboarding/getStateFees'
 import type { CouponDiscountType, CouponStatus } from '@/types/admin'
 
 const revalidatePathTyped = revalidatePath as unknown as (path: string, type?: 'layout' | 'page') => void
 
 function parseCouponCode(raw: string): string {
   return raw.trim().toUpperCase()
+}
+
+const VALID_STATE_CODES = new Set(STATE_FEES.map((state) => state.stateCode))
+
+/**
+ * Reads the multi-select state restriction off the form.
+ * An empty result means the coupon is valid in every state.
+ */
+function parseAllowedStates(formData: FormData): { states: string[] } | { error: string } {
+  const raw = formData.getAll('allowedStates')
+  const states = Array.from(
+    new Set(
+      raw
+        .map((value) => String(value).trim().toUpperCase())
+        .filter((value) => value.length > 0)
+    )
+  )
+
+  const unknown = states.filter((code) => !VALID_STATE_CODES.has(code))
+  if (unknown.length > 0) {
+    return { error: `Unknown state code: ${unknown.join(', ')}` }
+  }
+
+  return { states }
 }
 
 async function verifyAdminRole() {
@@ -79,6 +104,11 @@ export async function createCoupon(formData: FormData): Promise<{ success: boole
     const perUserUsesError = validateUsageLimit(perUserUses, 'Per-user uses')
     if (perUserUsesError) return { success: false, error: perUserUsesError }
 
+    const allowedStatesResult = parseAllowedStates(formData)
+    if ('error' in allowedStatesResult) {
+      return { success: false, error: allowedStatesResult.error }
+    }
+
     const { error } = await adminClient.from('coupons').insert({
       name,
       code,
@@ -87,6 +117,7 @@ export async function createCoupon(formData: FormData): Promise<{ success: boole
       total_uses: totalUses,
       used_count: 0,
       per_user_uses: perUserUses,
+      allowed_states: allowedStatesResult.states,
       status,
     })
 
@@ -137,6 +168,11 @@ export async function updateCoupon(id: string, formData: FormData): Promise<{ su
     const perUserUsesError = validateUsageLimit(perUserUses, 'Per-user uses')
     if (perUserUsesError) return { success: false, error: perUserUsesError }
 
+    const allowedStatesResult = parseAllowedStates(formData)
+    if ('error' in allowedStatesResult) {
+      return { success: false, error: allowedStatesResult.error }
+    }
+
     const { error } = await adminClient
       .from('coupons')
       .update({
@@ -146,6 +182,7 @@ export async function updateCoupon(id: string, formData: FormData): Promise<{ su
         discount_value: discountValue,
         total_uses: totalUses,
         per_user_uses: perUserUses,
+        allowed_states: allowedStatesResult.states,
         status,
         updated_at: new Date().toISOString(),
       })

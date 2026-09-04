@@ -640,6 +640,7 @@ export type Database = {
       }
       coupons: {
         Row: {
+          allowed_states: string[]
           code: string
           created_at: string
           discount_type: string
@@ -653,6 +654,7 @@ export type Database = {
           used_count: number
         }
         Insert: {
+          allowed_states?: string[]
           code: string
           created_at?: string
           discount_type: string
@@ -666,6 +668,7 @@ export type Database = {
           used_count?: number
         }
         Update: {
+          allowed_states?: string[]
           code?: string
           created_at?: string
           discount_type?: string

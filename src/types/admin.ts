@@ -81,6 +81,8 @@ export interface Coupon {
   totalUses: number
   usedCount: number
   perUserUses: number
+  /** US state codes the coupon is limited to. Empty = valid in every state. */
+  allowedStates: string[]
   status: CouponStatus
   createdAt: string
   updatedAt: string

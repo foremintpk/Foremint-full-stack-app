@@ -397,6 +397,10 @@ export default function InvoiceGeneratorForm() {
         </p>
       </header>
 
+      {/* Previously generated invoices, collapsed by default so the form stays
+          in view. Expanding fetches them; each generate refreshes the list. */}
+      <InvoiceList onEdit={loadInvoice} refreshToken={listRefresh} />
+
       <div className="grid gap-5 lg:grid-cols-[1fr_320px] lg:items-start">
         <div className="space-y-5">
           {/* ------------------------------------------------ customer */}

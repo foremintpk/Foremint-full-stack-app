@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { CouponDiscountType } from '@/types/onboarding'
+import { getStateFee } from './getStateFees'
 
 export interface ResolvedCoupon {
   id: string
@@ -12,6 +13,8 @@ export interface ResolvedCoupon {
   totalUses: number
   usedCount: number
   perUserUses: number
+  /** US state codes the coupon is limited to. Empty = valid in every state. */
+  allowedStates: string[]
   status: 'active' | 'inactive'
 }
 
@@ -19,10 +22,35 @@ export interface CouponValidationInput {
   code: string
   userId: string
   subtotal: number
+  /**
+   * Formation state code from onboarding step 2, e.g. "WY". Null/empty for
+   * orders that have no US state yet (or UK Ltd orders), which makes any
+   * state-restricted coupon fail.
+   */
+  formationState?: string | null
 }
 
 function normalizeCouponCode(code: string): string {
   return code.trim().toUpperCase()
+}
+
+function normalizeStateCode(state: string | null | undefined): string {
+  return (state ?? '').trim().toUpperCase()
+}
+
+/** "Wyoming", "Wyoming or Delaware", "Wyoming, Delaware or Texas". */
+function formatStateList(stateCodes: string[]): string {
+  const names = stateCodes.map((code) => getStateFee(code)?.stateName ?? code)
+  if (names.length === 1) return names[0]
+  return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`
+}
+
+/** Coupon rows store an empty array when the coupon is valid everywhere. */
+function normalizeAllowedStates(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((value) => normalizeStateCode(typeof value === 'string' ? value : null))
+    .filter((value) => value.length > 0)
 }
 
 function calculateDiscount(coupon: Pick<ResolvedCoupon, 'discountType' | 'discountValue'>, subtotal: number): number {
@@ -53,7 +81,7 @@ async function fetchCouponUsageCount(
 
 export async function validateCoupon(
   supabase: SupabaseClient<Database>,
-  { code, userId, subtotal }: CouponValidationInput
+  { code, userId, subtotal, formationState }: CouponValidationInput
 ): Promise<{ coupon: ResolvedCoupon } | { error: string }> {
   const normalized = normalizeCouponCode(code)
   if (!normalized) {
@@ -103,6 +131,16 @@ export async function validateCoupon(
     return { error: 'You have already used this coupon the maximum number of times.' }
   }
 
+  const allowedStates = normalizeAllowedStates(coupon.allowed_states)
+  if (allowedStates.length > 0) {
+    const orderState = normalizeStateCode(formationState)
+    if (!orderState || !allowedStates.includes(orderState)) {
+      return {
+        error: `This coupon is only valid for orders formed in ${formatStateList(allowedStates)}.`,
+      }
+    }
+  }
+
   const resolved: ResolvedCoupon = {
     id: coupon.id,
     name: coupon.name,
@@ -116,6 +154,7 @@ export async function validateCoupon(
     totalUses,
     usedCount,
     perUserUses,
+    allowedStates,
     status: active ? 'active' : 'inactive',
   }
 

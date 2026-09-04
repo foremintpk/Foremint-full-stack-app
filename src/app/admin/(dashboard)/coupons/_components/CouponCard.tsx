@@ -1,7 +1,8 @@
 'use client'
 
 import { useTransition, useState } from 'react'
-import { BadgePercent, ToggleLeft, ToggleRight, Pencil, Infinity, Trash2 } from 'lucide-react'
+import { BadgePercent, ToggleLeft, ToggleRight, Pencil, Infinity, Trash2, MapPin } from 'lucide-react'
+import { getStateFee } from '@/lib/onboarding/getStateFees'
 import type { Coupon } from '@/types/admin'
 import { deleteCoupon, toggleCouponStatus } from '@/lib/admin/actions/couponActions'
 import { useRouter } from 'next/navigation'
@@ -53,6 +54,8 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
   const perUserDisplay = coupon.perUserUses === -1
     ? 'Unlimited'
     : `${coupon.perUserUses} use${coupon.perUserUses > 1 ? 's' : ''}`
+
+  const allowedStates = coupon.allowedStates ?? []
 
   return (
     <>
@@ -112,6 +115,28 @@ export function CouponCard({ coupon }: { coupon: Coupon }) {
           <InfoBox label="Usage" value={limitDisplay} />
           <InfoBox label="Per User" value={perUserDisplay} />
           <InfoBox label="Status" value={coupon.status} />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+            <MapPin className="h-3 w-3" />
+            States
+          </span>
+          {allowedStates.length === 0 ? (
+            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500">
+              All states
+            </span>
+          ) : (
+            allowedStates.map((code) => (
+              <span
+                key={code}
+                className="rounded-full bg-[#34088f]/10 px-2 py-0.5 text-[11px] font-semibold text-[#34088f]"
+                title={getStateFee(code)?.stateName ?? code}
+              >
+                {code}
+              </span>
+            ))
+          )}
         </div>
 
         <div className="mt-5">

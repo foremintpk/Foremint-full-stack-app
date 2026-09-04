@@ -90,6 +90,9 @@ export async function POST(
         code: couponCode,
         userId,
         subtotal,
+        // Read from the server-side draft, never from the client payload, so a
+        // state-restricted coupon cannot be applied to another state's order.
+        formationState: formData.formationState,
       })
 
       if ('error' in couponResult) {
@@ -201,6 +204,7 @@ export async function POST(
           totalUses: 0,
           usedCount: 0,
           perUserUses: 0,
+          allowedStates: [],
           status: 'active',
         },
         userId,

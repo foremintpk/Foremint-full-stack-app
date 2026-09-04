@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useTransition } from 'react'
 import { createCoupon, updateCoupon } from '@/lib/admin/actions/couponActions'
+import { STATE_FEES } from '@/lib/onboarding/getStateFees'
 import type { Coupon } from '@/types/admin'
 
 interface CouponModalProps {
@@ -27,7 +28,30 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
   const [perUserUsesVal, setPerUserUsesVal] = useState<string>(
     coupon ? String(coupon.perUserUses) : '-1'
   )
+  // "Single use per customer" is just a shortcut for per-user uses = 1.
+  const [singleUsePerCustomer, setSingleUsePerCustomer] = useState<boolean>(
+    coupon ? coupon.perUserUses === 1 : false
+  )
+  const [restrictToStates, setRestrictToStates] = useState<boolean>(
+    (coupon?.allowedStates?.length ?? 0) > 0
+  )
+  const [allowedStates, setAllowedStates] = useState<string[]>(
+    coupon?.allowedStates ?? []
+  )
   const formRef = useRef<HTMLFormElement>(null)
+
+  const toggleSingleUse = (checked: boolean) => {
+    setSingleUsePerCustomer(checked)
+    if (checked) setPerUserUsesVal('1')
+  }
+
+  const toggleState = (stateCode: string) => {
+    setAllowedStates((prev) =>
+      prev.includes(stateCode)
+        ? prev.filter((code) => code !== stateCode)
+        : [...prev, stateCode]
+    )
+  }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -42,8 +66,18 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
       setError('Per User must be -1 (unlimited) or a positive integer (e.g. 1)')
       return
     }
+    if (restrictToStates && allowedStates.length === 0) {
+      setError('Select at least one state, or turn off the state restriction.')
+      return
+    }
 
     const formData = new FormData(formRef.current)
+    // The state checkboxes live outside the form's native fields when the
+    // restriction is off, so set them explicitly.
+    formData.delete('allowedStates')
+    if (restrictToStates) {
+      allowedStates.forEach((code) => formData.append('allowedStates', code))
+    }
     setError(null)
 
     startTransition(async () => {
@@ -195,7 +229,7 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
                   step="1"
                   value={perUserUsesVal}
                   onChange={(e) => setPerUserUsesVal(e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || singleUsePerCustomer}
                   placeholder="-1"
                   className={`w-full rounded-full border px-4 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f] disabled:bg-gray-50 ${
                     perUserUsesVal && !isValidUsageLimit(perUserUsesVal)
@@ -207,6 +241,91 @@ export function CouponModal({ mode, coupon, onClose }: CouponModalProps): React.
                   Enter -1 for unlimited usage per customer
                 </p>
               </div>
+            </div>
+
+            {/* Single use per customer */}
+            <label className="flex items-start gap-3 rounded-xl border border-[#e0d9f7] bg-[#faf8ff] px-4 py-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={singleUsePerCustomer}
+                onChange={(e) => toggleSingleUse(e.target.checked)}
+                disabled={isPending}
+                className="mt-0.5 h-4 w-4 rounded border-[#c9bdf0] text-[#34088f] focus:ring-[#34088f]/30"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-gray-800">
+                  Single use per customer
+                </span>
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Each customer can redeem this coupon only once. Sets Per User to 1.
+                </span>
+              </span>
+            </label>
+
+            {/* State restriction */}
+            <div className="rounded-xl border border-[#e0d9f7] bg-[#faf8ff] px-4 py-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={restrictToStates}
+                  onChange={(e) => setRestrictToStates(e.target.checked)}
+                  disabled={isPending}
+                  className="mt-0.5 h-4 w-4 rounded border-[#c9bdf0] text-[#34088f] focus:ring-[#34088f]/30"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-gray-800">
+                    Limit to specific states
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    The coupon only works when the order&apos;s formation state is one
+                    of the selected states. Leave off to allow every state.
+                  </span>
+                </span>
+              </label>
+
+              {restrictToStates && (
+                <div className="mt-3 border-t border-[#e0d9f7] pt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider">
+                      {allowedStates.length} selected
+                    </span>
+                    {allowedStates.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAllowedStates([])}
+                        disabled={isPending}
+                        className="text-[11px] font-semibold text-[#34088f] hover:underline disabled:opacity-50"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-[#e0d9f7] bg-white p-2 grid grid-cols-2 sm:grid-cols-3 gap-1">
+                    {STATE_FEES.map((state) => {
+                      const selected = allowedStates.includes(state.stateCode)
+                      return (
+                        <label
+                          key={state.stateCode}
+                          className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs cursor-pointer transition-colors ${
+                            selected
+                              ? 'bg-[#34088f]/10 text-[#34088f] font-semibold'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleState(state.stateCode)}
+                            disabled={isPending}
+                            className="h-3.5 w-3.5 rounded border-[#c9bdf0] text-[#34088f] focus:ring-[#34088f]/30"
+                          />
+                          <span className="truncate">{state.stateName}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Status */}
