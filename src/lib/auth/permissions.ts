@@ -27,11 +27,9 @@ export type AdminSection =
   | 'ein'
   | 'documents'
   | 'invoice-generator'
-  | 'paypal-accounts'
   | 'addons'
   | 'packages'
   | 'coupons'
-  | 'invoices'
   | 'expenses'
   | 'users'
   | 'b2b-customers'
@@ -48,11 +46,9 @@ const SECTIONS_BY_ROLE: Partial<Record<UserRole, AdminSection[]>> = {
   manager: [
     'overview',
     'llc-registrations',
-    'paypal-accounts',
     'addons',
     'packages',
     'coupons',
-    'invoices',
     'expenses',
     'users',
     'b2b-customers',

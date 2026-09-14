@@ -3,6 +3,8 @@
 // Sent after an AUTOMATIC run only. A manual run happens with the operator
 // watching the progress banner, so emailing them about it would be noise.
 
+import { RESPONSIVE_EMAIL_STYLES } from './responsive'
+
 export interface Ss4BatchCompleteProps {
   /** Documents generated successfully. */
   passed: number;
@@ -58,6 +60,7 @@ export function Ss4BatchCompleteHtml({
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SS-4 documents generated — Foremint</title>
+  ${RESPONSIVE_EMAIL_STYLES}
 </head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 
@@ -65,7 +68,7 @@ export function Ss4BatchCompleteHtml({
     <tr>
       <td align="center" style="padding:48px 16px 40px;">
 
-        <table width="600" cellpadding="0" cellspacing="0" role="presentation"
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="fm-card"
           style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 8px 32px rgba(0,0,0,0.06);max-width:600px;width:100%;">
 
           <tr>
@@ -75,7 +78,7 @@ export function Ss4BatchCompleteHtml({
           ${
             logoUrl
               ? `<tr>
-            <td align="center" style="padding:28px 32px 0;">
+            <td class="fm-pad" align="center" style="padding:28px 32px 0;">
               <img src="${escapeHtml(logoUrl)}" alt="Foremint" height="28" style="display:block;border:0;height:28px;" />
             </td>
           </tr>`
@@ -83,11 +86,11 @@ export function Ss4BatchCompleteHtml({
           }
 
           <tr>
-            <td style="padding:28px 32px 8px;">
+            <td class="fm-pad" style="padding:28px 32px 8px;">
               <p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#34088f;">
                 Scheduled run
               </p>
-              <h1 style="margin:0;font-size:22px;line-height:1.3;font-weight:700;color:#111827;">
+              <h1 class="fm-h1" style="margin:0;font-size:22px;line-height:1.3;font-weight:700;color:#111827;">
                 ${passed} SS-4 document${passed === 1 ? '' : 's'} generated
               </h1>
               <p style="margin:8px 0 0;font-size:14px;color:#6b7280;line-height:1.6;">
@@ -103,7 +106,7 @@ export function Ss4BatchCompleteHtml({
 
           <!-- Counts -->
           <tr>
-            <td style="padding:20px 32px 0;">
+            <td class="fm-pad" style="padding:20px 32px 0;">
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
                 style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
                 <tr>
@@ -122,7 +125,7 @@ export function Ss4BatchCompleteHtml({
 
           <!-- Download -->
           <tr>
-            <td align="center" style="padding:24px 32px 4px;">
+            <td class="fm-pad" align="center" style="padding:24px 32px 4px;">
               <a href="${escapeHtml(batchUrl)}"
                 style="display:inline-block;background:#34088f;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;">
                 Download the documents
@@ -136,7 +139,7 @@ export function Ss4BatchCompleteHtml({
           ${
             failed > 0
               ? `<tr>
-            <td style="padding:24px 32px 0;">
+            <td class="fm-pad" style="padding:24px 32px 0;">
               <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#991b1b;">
                 Needs attention
               </p>
@@ -150,7 +153,7 @@ export function Ss4BatchCompleteHtml({
           }
 
           <tr>
-            <td style="padding:28px 32px 32px;">
+            <td class="fm-pad" style="padding:28px 32px 32px;">
               <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;border-top:1px solid #f3f4f6;padding-top:16px;">
                 You are receiving this because SS-4 generation is set to Automatic.
                 Switch it to Manual under Admin → EIN to stop these emails.

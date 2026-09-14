@@ -19,7 +19,11 @@ import { getAdminBadgeCounts } from '@/lib/admin/actions/getAdminBadgeCounts';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminRole } from '@/types/admin';
 
-export const revalidate = 60; // Hold layout renders in Full Route Cache for max 60s
+// Rendered per request, matching the customer dashboard layout. The sidebar
+// badge counts are fetched here, and a route-level `revalidate` caches the
+// rendered layout above that fetch, so a status change or new ticket could take
+// up to 60s to show even though the counts themselves are read fresh.
+export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboardLayout({
   children,

@@ -12,9 +12,15 @@ function StatusBadge({ status }: { status: string }) {
     submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-700' },
     ein_pending:        { label: 'EIN Pending',        cls: 'bg-orange-100 text-orange-700' },
     formed:             { label: 'Formed',             cls: 'bg-emerald-100 text-emerald-700' },
+    payment_pending:    { label: 'Payment Pending',    cls: 'bg-rose-50 text-rose-600' },
     cancelled:          { label: 'Cancelled',          cls: 'bg-gray-100 text-gray-500' },
   };
-  const config = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
+  // Fall back to a humanised label rather than the raw enum key, so an
+  // unmapped status never renders as "PAYMENT_PENDING" with its underscores.
+  const config = map[status] ?? {
+    label: status.replace(/_/g, ' '),
+    cls: 'bg-gray-100 text-gray-600',
+  };
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope ${config.cls}`}>
       {config.label}

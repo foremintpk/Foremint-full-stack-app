@@ -1921,6 +1921,7 @@ export type Database = {
         | "submitted_in_state"
         | "ein_pending"
         | "formed"
+        | "payment_pending"
         | "cancelled"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
@@ -2096,6 +2097,7 @@ export const Constants = {
         "submitted_in_state",
         "ein_pending",
         "formed",
+        "payment_pending",
         "cancelled",
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],

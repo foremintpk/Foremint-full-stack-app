@@ -33,6 +33,7 @@ export function MemberCard({
  const [showPreviewModal, setShowPreviewModal] = useState(false);
  const [isDeleting, setIsDeleting] = useState(false);
  const [isReplacing, setIsReplacing] = useState(false);
+ const [uploadError, setUploadError] = useState<string | null>(null);
 
  const memberSlotKey = `member_${member.index}_passport`;
 
@@ -56,6 +57,7 @@ export function MemberCard({
 
  const handleReplaceUpload = async (file: File) => {
  setIsReplacing(true);
+ setUploadError(null);
  try {
  const body = new FormData();
  body.append('file', file);
@@ -67,15 +69,33 @@ export function MemberCard({
  body,
  });
 
- const data = (await res.json()) as { error?: string };
+ // Read the body defensively. A 500 can arrive as HTML (the dev overlay, or a
+ // proxy/gateway error page), and calling res.json() on that throws a parse
+ // error that masks the real server message and leaves the caller guessing.
+ const raw = await res.text();
+ let data: { error?: string } = {};
+ try {
+ data = raw ? (JSON.parse(raw) as { error?: string }) : {};
+ } catch {
+ data = {};
+ }
+
  if (!res.ok) {
- alert(data.error || 'Failed to upload replacement document');
+ const looksLikeHtml = raw.trimStart().startsWith('<');
+ setUploadError(
+ data.error ||
+ (raw && !looksLikeHtml ? raw.slice(0, 200) : '') ||
+ `Upload failed (HTTP ${res.status}). Check the server logs for details.`
+ );
  return;
  }
 
+ setUploadError(null);
  router.refresh();
  } catch (err: unknown) {
- alert(err instanceof Error ? err.message : 'Upload failed');
+ setUploadError(
+ err instanceof Error ? err.message : 'Upload failed — please try again.'
+ );
  } finally {
  setIsReplacing(false);
  if (fileInputRef.current) fileInputRef.current.value = '';
@@ -202,6 +222,15 @@ export function MemberCard({
  )}
  {hasUploadedDoc ? 'Replace' : 'Upload'}
  </button>
+
+ {uploadError && (
+ <p
+ role="alert"
+ className="w-full mt-1 text-xs text-red-600 break-words"
+ >
+ {uploadError}
+ </p>
+ )}
 
  {/* Resubmission Trigger Button */}
  <ResubmissionButton

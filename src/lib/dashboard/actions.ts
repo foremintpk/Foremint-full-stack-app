@@ -6,6 +6,7 @@ import { createClient as createRawClient } from '@supabase/supabase-js';
 import { revalidateTag as nextRevalidateTag } from 'next/cache';
 const revalidateTag = nextRevalidateTag as any;
 import { getSession } from '@/lib/auth/get-session';
+import { createAdminNotification } from '@/lib/notifications/createAdminNotification';
 import { sendAdminReceiptUploadedEmail } from '@/lib/email/sendOrderConfirmation';
 import { sendNewTicketAdminEmail } from '@/lib/email/sendTicketEmails';
 import type { UpdateEmailResult, UpdatePasswordResult } from '@/types/admin';
@@ -287,14 +288,21 @@ export async function submitDocumentProof(
 
     // 4. Send admin notification
     const clientName = session.profile.full_name || session.profile.email;
-    await supabase.from('notifications').insert({
+    // Service-role write: the acting user is a customer, so a request-scoped
+    // insert is rejected by RLS (notifications has no INSERT policy).
+    const notifResult = await createAdminNotification({
       type: 'document_resubmitted',
-      target_role: 'administrator',
       title: 'Resubmitted Document',
       body: `Customer ${clientName} uploaded a new document for slot "${slotKey}" on order #${order.order_number || order.id.slice(0, 8)}`,
       link: `/admin/llc-registrations/${orderId}`,
-      is_read: false,
     });
+    if (!notifResult.ok) {
+      console.error('[resubmitDocument] admin notification failed', {
+        orderId,
+        slotKey,
+        error: notifResult.error,
+      });
+    }
 
     // 5. Invalidate caches
     revalidateTag(`order-${orderId}`, 'max');
@@ -380,14 +388,18 @@ export async function submitBankTransferReceipt(
       snapshot?.businessName ||
       `Order ${order.order_number || order.id.slice(0, 8)}`;
 
-    await supabase.from('notifications').insert({
+    const receiptNotif = await createAdminNotification({
       type: 'receipt_uploaded',
-      target_role: 'administrator',
       title: 'Payment Proof Uploaded',
       body: `${clientName} uploaded a bank transfer receipt for ${businessName} (#${order.order_number || order.id.slice(0, 8)})`,
       link: `/admin/llc-registrations/${orderId}`,
-      is_read: false,
     });
+    if (!receiptNotif.ok) {
+      console.error('[uploadPaymentReceipt] admin notification failed', {
+        orderId,
+        error: receiptNotif.error,
+      });
+    }
 
     // 4b. Email the admin (fire-and-forget — never blocks the upload)
     sendAdminReceiptUploadedEmail({
@@ -448,14 +460,18 @@ export async function simulateStripePayment(
 
     // 3. Send admin notification
     const clientName = session.profile.full_name || session.profile.email;
-    await supabase.from('notifications').insert({
+    const paymentNotif = await createAdminNotification({
       type: 'order_payment_received',
-      target_role: 'administrator',
       title: 'Payment Received',
       body: `Card payment received for LLC order #${order.order_number || order.id.slice(0, 8)} by client ${clientName} ($${order.grand_total})`,
       link: `/admin/llc-registrations/${orderId}`,
-      is_read: false,
     });
+    if (!paymentNotif.ok) {
+      console.error('[recordCardPayment] admin notification failed', {
+        orderId,
+        error: paymentNotif.error,
+      });
+    }
 
     // 4. Invalidate caches
     revalidateTag(`order-${orderId}`, 'max');
@@ -550,14 +566,18 @@ export async function createSupportQuery(
 
     // 3. Notify administrator in-app
     const clientName = session.profile.full_name || session.profile.email;
-    await supabase.from('notifications').insert({
+    const ticketNotif = await createAdminNotification({
       type: 'new_support_ticket',
-      target_role: 'administrator',
       title: 'New Support Ticket',
       body: `Customer ${clientName} created support ticket: "${subject}"`,
       link: `/admin/queries`,
-      is_read: false,
     });
+    if (!ticketNotif.ok) {
+      console.error('[createSupportTicket] admin notification failed', {
+        queryId: query.id,
+        error: ticketNotif.error,
+      });
+    }
 
     // 4. Email all active admins (fire-and-forget, dynamic recipient list)
     void (async () => {
@@ -638,14 +658,18 @@ export async function sendSupportMessage(
 
     // 3. Notify admin
     const clientName = session.profile.full_name || session.profile.email;
-    await supabase.from('notifications').insert({
+    const replyNotif = await createAdminNotification({
       type: 'new_support_message',
-      target_role: 'administrator',
       title: 'New Support Message',
       body: `Customer ${clientName} sent a reply on ticket #${queryId.slice(0, 8)}`,
       link: `/admin/queries`,
-      is_read: false,
     });
+    if (!replyNotif.ok) {
+      console.error('[replyToTicket] admin notification failed', {
+        queryId,
+        error: replyNotif.error,
+      });
+    }
 
     revalidateTag(`customer-dashboard-${userId}`, 'max');
     return { success: true };

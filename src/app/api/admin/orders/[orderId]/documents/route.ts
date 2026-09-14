@@ -203,6 +203,21 @@ export async function POST(
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+    // Cloudinary rejects with an object whose message sits on `error.message`
+    // rather than on the thrown value itself, so `err.message` alone yields
+    // undefined and the client shows a bare "Internal Server Error".
+    const message =
+      err?.message ||
+      err?.error?.message ||
+      (typeof err === 'string' ? err : null) ||
+      'Internal Server Error';
+
+    console.error('[admin/orders/documents] upload failed', {
+      message,
+      name: err?.name,
+      http_code: err?.http_code ?? err?.error?.http_code,
+    });
+
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

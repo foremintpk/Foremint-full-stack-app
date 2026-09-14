@@ -210,6 +210,7 @@ async function fetchLlcOrders(
     let submittedInState = 0;
     let einPending = 0;
     let formed = 0;
+    let paymentPending = 0;
 
     statsRaw.forEach((s) => {
       const st = s.status;
@@ -218,6 +219,7 @@ async function fetchLlcOrders(
       else if (st === 'submitted_in_state') submittedInState++;
       else if (st === 'ein_pending') einPending++;
       else if (st === 'formed') formed++;
+      else if (st === 'payment_pending') paymentPending++;
     });
 
     return {
@@ -232,6 +234,7 @@ async function fetchLlcOrders(
         submittedInState,
         einPending,
         formed,
+        paymentPending,
       },
     };
   };

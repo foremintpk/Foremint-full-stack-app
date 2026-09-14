@@ -33,10 +33,20 @@ function StatusBadge({ status }: { status: string }) {
     completed: { label: 'Active', cls: 'bg-emerald-100 text-emerald-700' },
     awaiting_documents: { label: 'Docs Needed', cls: 'bg-orange-100 text-orange-700' },
     awaiting_payment: { label: 'Payment Needed', cls: 'bg-rose-100 text-rose-700' },
+    // Order-status values. These were absent, so they rendered as raw keys
+    // ("submitted_in_state") through the fallback below.
+    initialized: { label: 'Initialized', cls: 'bg-blue-100 text-blue-700' },
+    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-700' },
+    ein_pending: { label: 'EIN Pending', cls: 'bg-orange-100 text-orange-700' },
     formed: { label: 'Formed', cls: 'bg-emerald-100 text-emerald-700' },
+    payment_pending: { label: 'Payment Pending', cls: 'bg-rose-50 text-rose-600' },
     cancelled: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-500' },
   };
-  const cfg = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
+  // Humanise unmapped values rather than printing the raw enum key.
+  const cfg = map[status] ?? {
+    label: status.replace(/_/g, ' '),
+    cls: 'bg-gray-100 text-gray-600',
+  };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope ${cfg.cls}`}>
       {cfg.label}

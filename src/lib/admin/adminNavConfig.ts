@@ -39,11 +39,6 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['administrator'],
   },
   {
-    label: 'PayPal Accounts',
-    href: '/admin/paypal-accounts',
-    icon: 'CreditCard',
-  },
-  {
     label: 'Addons',
     href: '/admin/addons',
     icon: 'Puzzle',
@@ -59,12 +54,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'TicketPercent',
   },
   {
-    label: 'Invoices',
-    href: '/admin/invoices',
-    icon: 'FileText',
-  },
-  {
-    // The client-facing USD invoice PDF, distinct from the PKR ledger above.
+    // The client-facing USD invoice PDF generator.
     label: 'Invoice Generator',
     href: '/admin/invoice-generator',
     icon: 'ReceiptText',

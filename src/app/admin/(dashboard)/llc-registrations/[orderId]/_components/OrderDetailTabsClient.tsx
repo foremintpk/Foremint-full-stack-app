@@ -100,14 +100,23 @@ export function OrderDetailTabsClient({
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
   }, []);
 
-  // Status badge color
-  const statusColors: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-800',
-    processing: 'bg-blue-100 text-blue-800',
-    formed: 'bg-emerald-100 text-emerald-800',
-    cancelled: 'bg-red-100 text-red-700',
+  // Status badge label + colour. Several order statuses were missing here, so
+  // they fell through to the grey default and rendered the raw enum key
+  // ("payment_pending") instead of a readable label.
+  const statusStyles: Record<string, { label: string; cls: string }> = {
+    pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-800' },
+    initialized: { label: 'Initialized', cls: 'bg-blue-100 text-blue-800' },
+    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-800' },
+    ein_pending: { label: 'EIN Pending', cls: 'bg-orange-100 text-orange-800' },
+    processing: { label: 'Processing', cls: 'bg-blue-100 text-blue-800' },
+    formed: { label: 'Formed', cls: 'bg-emerald-100 text-emerald-800' },
+    payment_pending: { label: 'Payment Pending', cls: 'bg-rose-50 text-rose-600' },
+    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700' },
   };
-  const statusColor = statusColors[order.status] ?? 'bg-gray-100 text-gray-600';
+  const statusStyle = statusStyles[order.status] ?? {
+    label: order.status.replace(/_/g, ' '),
+    cls: 'bg-gray-100 text-gray-600',
+  };
 
   return (
     <div className="space-y-0 font-inter">
@@ -141,8 +150,8 @@ export function OrderDetailTabsClient({
                       ? new Date(order.submittedAt).toLocaleDateString()
                       : new Date(order.createdAt).toLocaleDateString()}
                   </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColor}`}>
-                    {order.status}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusStyle.cls}`}>
+                    {statusStyle.label}
                   </span>
                 </div>
               </div>

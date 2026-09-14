@@ -36,6 +36,7 @@ export default function LlcListTopStats({
     { label: 'Submitted In State', value: stats.submittedInState, key: 'submitted_in_state' as const },
     { label: 'EIN Pending',        value: stats.einPending,       key: 'ein_pending'        as const },
     { label: 'Formed',             value: stats.formed,           key: 'formed'             as const },
+    { label: 'Payment Pending',    value: stats.paymentPending,   key: 'payment_pending'    as const },
   ];
 
   return (

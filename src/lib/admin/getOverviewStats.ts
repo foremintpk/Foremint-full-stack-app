@@ -11,17 +11,14 @@ async function fetchOverviewStats(
   start: string,
   end: string
 ): Promise<OverviewStats> {
-  const [llcRes, paypalRes, llcRevenueRes, paypalRevenueRes, invoiceRes] = await Promise.all([
+  // PayPal accounts and the PKR invoice ledger were removed from the product;
+  // earnings are LLC order revenue only. Both tables were empty, so the figures
+  // reported here are unchanged by their removal.
+  const [llcRes, llcRevenueRes] = await Promise.all([
     supabase
       .from('orders')
       .select('status, created_at')
       .eq('order_type', 'llc')
-      .gte('created_at', start)
-      .lte('created_at', end),
-
-    supabase
-      .from('paypal_orders')
-      .select('status, deal_amount, created_at')
       .gte('created_at', start)
       .lte('created_at', end),
 
@@ -32,32 +29,13 @@ async function fetchOverviewStats(
       .eq('payment_status', 'paid')
       .gte('created_at', start)
       .lte('created_at', end),
-
-    supabase
-      .from('paypal_orders')
-      .select('deal_amount, created_at')
-      .eq('status', 'completed')
-      .gte('created_at', start)
-      .lte('created_at', end),
-
-    supabase
-      .from('invoices')
-      .select('commission_earned, created_at')
-      .gte('created_at', start)
-      .lte('created_at', end),
   ]);
 
   if (llcRes.error) console.error('Error fetching LLC stats:', llcRes.error);
-  if (paypalRes.error) console.error('Error fetching PayPal stats:', paypalRes.error);
   if (llcRevenueRes.error) console.error('Error fetching LLC revenue:', llcRevenueRes.error);
-  if (paypalRevenueRes.error) console.error('Error fetching PayPal revenue:', paypalRevenueRes.error);
-  if (invoiceRes.error) console.error('Error fetching Invoice stats:', invoiceRes.error);
 
   const llcOrders = llcRes.data || [];
-  const paypalOrders = paypalRes.data || [];
   const llcRevenueData = llcRevenueRes.data || [];
-  const paypalRevenueData = paypalRevenueRes.data || [];
-  const invoiceData = invoiceRes.data || [];
 
   // 1. LLC order counts
   const llcTotal = llcOrders.length;
@@ -69,44 +47,19 @@ async function fetchOverviewStats(
     else if (s === 'formed') llcFormed++;
   });
 
-  // 2. PayPal order counts
-  const paypalTotal = paypalOrders.length;
-  let paypalPending = 0, paypalProcessing = 0, paypalCompleted = 0;
-  paypalOrders.forEach((o) => {
-    const s = o.status as string;
-    if (s === 'pending') paypalPending++;
-    else if (s === 'in_progress') paypalProcessing++;
-    else if (s === 'completed') paypalCompleted++;
-  });
-
-  // 3. Revenue totals
+  // 2. Revenue totals — LLC orders are now the only earnings source.
   const llcRevenue = llcRevenueData.reduce((sum, r) => sum + (Number(r.grand_total) || 0), 0);
-  const paypalRevenue = paypalRevenueData.reduce((sum, r) => sum + (Number(r.deal_amount) || 0), 0);
-  const invoiceCommissions = invoiceData.reduce((sum, r) => sum + (Number(r.commission_earned) || 0), 0);
-  const totalEarnings = llcRevenue + paypalRevenue + invoiceCommissions;
+  const totalEarnings = llcRevenue;
 
-  // 4. Percentages
-  let llcPercent = 0, paypalPercent = 0, invoicePercent = 0;
-  if (totalEarnings > 0) {
-    llcPercent = Math.round((llcRevenue / totalEarnings) * 100);
-    paypalPercent = Math.round((paypalRevenue / totalEarnings) * 100);
-    invoicePercent = Math.round((invoiceCommissions / totalEarnings) * 100);
-    const sum = llcPercent + paypalPercent + invoicePercent;
-    if (sum !== 100 && sum > 0) {
-      const diff = 100 - sum;
-      const maxVal = Math.max(llcPercent, paypalPercent, invoicePercent);
-      if (maxVal === llcPercent) llcPercent += diff;
-      else if (maxVal === paypalPercent) paypalPercent += diff;
-      else invoicePercent += diff;
-    }
-  }
+  // 3. Percentages
+  const llcPercent = totalEarnings > 0 ? 100 : 0;
 
   // 5. Daily trend — group all records by YYYY-MM-DD
   const trendMap = new Map<string, DailyTrendPoint>();
 
   const getOrCreate = (date: string): DailyTrendPoint => {
     if (!trendMap.has(date)) {
-      trendMap.set(date, { date, llcOrders: 0, paypalOrders: 0, totalRevenue: 0 });
+      trendMap.set(date, { date, llcOrders: 0, totalRevenue: 0 });
     }
     return trendMap.get(date)!;
   };
@@ -116,24 +69,9 @@ async function fetchOverviewStats(
     getOrCreate(d).llcOrders++;
   });
 
-  paypalOrders.forEach((o) => {
-    const d = (o.created_at as string).split('T')[0];
-    getOrCreate(d).paypalOrders++;
-  });
-
   llcRevenueData.forEach((o) => {
     const d = (o.created_at as string).split('T')[0];
     getOrCreate(d).totalRevenue += Number(o.grand_total) || 0;
-  });
-
-  paypalRevenueData.forEach((o) => {
-    const d = (o.created_at as string).split('T')[0];
-    getOrCreate(d).totalRevenue += Number(o.deal_amount) || 0;
-  });
-
-  invoiceData.forEach((o) => {
-    const d = (o.created_at as string).split('T')[0];
-    getOrCreate(d).totalRevenue += Number(o.commission_earned) || 0;
   });
 
   // Fill in missing days in the range so the chart shows a continuous x-axis
@@ -152,8 +90,7 @@ async function fetchOverviewStats(
 
   return {
     llc: { total: llcTotal, pending: llcPending, inProgress: llcInProgress, formed: llcFormed },
-    paypal: { total: paypalTotal, pending: paypalPending, processing: paypalProcessing, completed: paypalCompleted },
-    earnings: { llcRevenue, paypalRevenue, invoiceCommissions, totalEarnings, llcPercent, paypalPercent, invoicePercent },
+    earnings: { llcRevenue, totalEarnings, llcPercent },
     dailyTrend,
     rangeKey,
     fetchedAt: new Date().toISOString(),

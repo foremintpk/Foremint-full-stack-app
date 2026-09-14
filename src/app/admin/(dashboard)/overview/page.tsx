@@ -1,6 +1,6 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
-import { Building2, CreditCard, TrendingUp } from 'lucide-react';
+import { Building2, TrendingUp } from 'lucide-react';
 import { getAdminUser } from '@/lib/admin/getAdminUser';
 import { getOverviewStats, DATE_RANGES } from '@/lib/admin/getOverviewStats';
 import { DateRangeFilter } from '@/types/admin';
@@ -50,8 +50,9 @@ export default async function AdminOverviewPage({ searchParams }: PageProps) {
         />
       </div>
 
-      {/* Stat cards (donut charts) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Stat cards (donut charts) — single column since PayPal Accounts was
+          removed; a 2-column grid would leave a half-width card stranded. */}
+      <div className="grid grid-cols-1 gap-6">
         <StatCard
           title="LLC Registrations"
           icon={<Building2 className="w-5 h-5" />}
@@ -65,18 +66,6 @@ export default async function AdminOverviewPage({ searchParams }: PageProps) {
           ]}
         />
 
-        <StatCard
-          title="PayPal Accounts"
-          icon={<CreditCard className="w-5 h-5" />}
-          iconBg="bg-blue-50"
-          iconColor="text-[#3b82f6]"
-          total={stats.paypal.total}
-          stats={[
-            { label: 'Pending',    value: stats.paypal.pending,    statusKey: 'pending' },
-            { label: 'Processing', value: stats.paypal.processing, statusKey: 'processing' },
-            { label: 'Completed',  value: stats.paypal.completed,  statusKey: 'completed' },
-          ]}
-        />
       </div>
 
       {/* Earnings bar chart card */}

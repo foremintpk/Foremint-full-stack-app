@@ -1,45 +1,44 @@
-// ─── Customer Order Confirmation Email Template ───────────────────────────────
+// ─── Customer "Payment Pending" Reminder Email Template ──────────────────────
+// Sent from the LLC Registrations list when an admin triggers a reminder for
+// orders in the `payment_pending` status. The tone is a courteous reminder, not
+// a dunning notice — the work is complete and the balance is the last step.
 
 import { RESPONSIVE_EMAIL_STYLES } from './responsive'
 
-export interface OrderCreatedEmailProps {
+export interface PaymentReminderEmailProps {
   userName: string
   orderNumber: string
   businessName: string
-  grandTotal: number
-  packageName: string
-  formationState: string
+  /** Outstanding balance in USD. Omitted from the layout when 0. */
+  pendingAmount?: number
+  billingUrl: string
   dashboardUrl: string
-  orderDate?: string
   logoUrl?: string
 }
 
-export function OrderCreatedEmailHtml({
+export function PaymentReminderEmailHtml({
   userName,
   orderNumber,
   businessName,
-  grandTotal,
-  packageName,
-  formationState,
+  pendingAmount = 0,
+  billingUrl,
   dashboardUrl,
-  orderDate,
   logoUrl,
-}: OrderCreatedEmailProps): string {
+}: PaymentReminderEmailProps): string {
   const greeting = userName || 'there'
-  const displayDate =
-    orderDate ??
-    new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+  const hasAmount = pendingAmount > 0
+  const displayDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LLC Order Confirmation</title>
+  <title>Pending Payment on Your Order</title>
   ${RESPONSIVE_EMAIL_STYLES}
 </head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -48,16 +47,13 @@ export function OrderCreatedEmailHtml({
     <tr>
       <td align="center" style="padding:48px 16px 40px;">
 
-        <!-- ── Outer card ── -->
         <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="fm-card"
           style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 8px 32px rgba(0,0,0,0.06);max-width:600px;width:100%;">
 
-          <!-- ── Top accent bar ── -->
           <tr>
             <td style="background:#34088f;height:4px;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
 
-          <!-- ── Logo header ── -->
           <tr>
             <td class="fm-pad" align="center" style="padding:36px 40px 28px;">
               ${logoUrl
@@ -67,7 +63,6 @@ export function OrderCreatedEmailHtml({
             </td>
           </tr>
 
-          <!-- ── Divider ── -->
           <tr>
             <td class="fm-pad" style="padding:0 40px;">
               <div style="height:1px;background:#f3f4f6;"></div>
@@ -77,65 +72,52 @@ export function OrderCreatedEmailHtml({
           <!-- ── Hero ── -->
           <tr>
             <td class="fm-pad fm-hero" style="padding:40px 40px 32px;text-align:center;">
-              <div style="display:inline-block;width:56px;height:56px;background:#f4f0fe;border-radius:16px;line-height:56px;font-size:28px;margin-bottom:20px;">✓</div>
+              <div style="display:inline-block;width:56px;height:56px;background:#fef3c7;border-radius:16px;line-height:56px;font-size:28px;margin-bottom:20px;">💳</div>
               <h1 class="fm-h1" style="margin:0 0 12px;font-size:24px;font-weight:700;color:#111827;letter-spacing:-0.4px;line-height:1.3;">
-                Order Received, ${greeting}
+                A Pending Payment on Your Order
               </h1>
-              <p style="margin:0 auto;font-size:15px;color:#6b7280;line-height:1.7;max-width:420px;">
-                Thank you for choosing Foremint. We have received your LLC formation order and our team is ready to get started.
+              <p style="margin:0 auto;font-size:15px;color:#6b7280;line-height:1.7;max-width:440px;">
+                Hello ${greeting}. The formation work for ${businessName ? `<strong style="color:#111827;">${businessName}</strong>` : 'your company'} is complete. To move your order forward, we kindly ask that you clear the remaining balance on your account.
               </p>
             </td>
           </tr>
 
-          <!-- ── Order Summary Card ── -->
+          <!-- ── Balance Card ── -->
           <tr>
             <td class="fm-pad" style="padding:0 40px 32px;">
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-                style="background:#fafafa;border:1px solid #ede9fe;border-radius:10px;overflow:hidden;">
-                <!-- Card header -->
+                style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;overflow:hidden;">
                 <tr>
-                  <td class="fm-pad-sm" style="padding:16px 24px;border-bottom:1px solid #ede9fe;background:#f4f0fe;">
-                    <p style="margin:0;font-size:11px;font-weight:700;color:#34088f;letter-spacing:0.12em;text-transform:uppercase;">Order Summary</p>
+                  <td class="fm-pad-sm" style="padding:16px 24px;border-bottom:1px solid #fde68a;background:#fef3c7;">
+                    <p style="margin:0;font-size:11px;font-weight:700;color:#92400e;letter-spacing:0.12em;text-transform:uppercase;">Payment Pending</p>
                   </td>
                 </tr>
-                <!-- Rows -->
                 <tr>
                   <td class="fm-pad-sm" style="padding:4px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
 
                       ${orderNumber ? `
                       <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Order ID</td>
-                        <td style="font-size:12px;font-weight:600;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;font-family:'SF Mono',Menlo,monospace;letter-spacing:0.02em;">#${orderNumber}</td>
+                        <td style="font-size:13px;color:#b45309;padding:11px 0;border-bottom:1px solid #fde68a;">Order ID</td>
+                        <td style="font-size:12px;font-weight:600;color:#92400e;text-align:right;padding:11px 0;border-bottom:1px solid #fde68a;font-family:'SF Mono',Menlo,monospace;letter-spacing:0.02em;">#${orderNumber}</td>
                       </tr>` : ''}
-
-                      <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Date</td>
-                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${displayDate}</td>
-                      </tr>
 
                       ${businessName ? `
                       <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">LLC Name</td>
-                        <td style="font-size:13px;font-weight:600;color:#111827;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${businessName}</td>
-                      </tr>` : ''}
-
-                      ${packageName ? `
-                      <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Package</td>
-                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${packageName}</td>
-                      </tr>` : ''}
-
-                      ${formationState ? `
-                      <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Formation State</td>
-                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${formationState}</td>
+                        <td style="font-size:13px;color:#b45309;padding:11px 0;border-bottom:1px solid #fde68a;">LLC Name</td>
+                        <td style="font-size:13px;font-weight:600;color:#92400e;text-align:right;padding:11px 0;border-bottom:1px solid #fde68a;">${businessName}</td>
                       </tr>` : ''}
 
                       <tr>
-                        <td style="font-size:14px;font-weight:700;color:#111827;padding:14px 0 6px;">Total</td>
-                        <td class="fm-amount" style="font-size:22px;font-weight:800;color:#34088f;text-align:right;padding:14px 0 6px;letter-spacing:-0.5px;">$${grandTotal.toLocaleString()}</td>
+                        <td style="font-size:13px;color:#b45309;padding:11px 0;${hasAmount ? 'border-bottom:1px solid #fde68a;' : ''}">Date</td>
+                        <td style="font-size:13px;font-weight:500;color:#92400e;text-align:right;padding:11px 0;${hasAmount ? 'border-bottom:1px solid #fde68a;' : ''}">${displayDate}</td>
                       </tr>
+
+                      ${hasAmount ? `
+                      <tr>
+                        <td style="font-size:14px;font-weight:700;color:#92400e;padding:14px 0 6px;">Amount Due</td>
+                        <td class="fm-amount" style="font-size:22px;font-weight:800;color:#b45309;text-align:right;padding:14px 0 6px;letter-spacing:-0.5px;">$${pendingAmount.toLocaleString()}</td>
+                      </tr>` : ''}
 
                     </table>
                   </td>
@@ -144,14 +126,14 @@ export function OrderCreatedEmailHtml({
             </td>
           </tr>
 
-          <!-- ── What Happens Next ── -->
+          <!-- ── Why this matters ── -->
           <tr>
             <td class="fm-pad" style="padding:0 40px 36px;">
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
                 style="background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
                 <tr>
                   <td class="fm-pad-sm" style="padding:16px 24px;border-bottom:1px solid #e5e7eb;">
-                    <p style="margin:0;font-size:11px;font-weight:700;color:#374151;letter-spacing:0.12em;text-transform:uppercase;">What Happens Next</p>
+                    <p style="margin:0;font-size:11px;font-weight:700;color:#374151;letter-spacing:0.12em;text-transform:uppercase;">How to Complete Your Payment</p>
                   </td>
                 </tr>
                 <tr>
@@ -163,8 +145,8 @@ export function OrderCreatedEmailHtml({
                           <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">1</div>
                         </td>
                         <td style="padding-bottom:18px;border-bottom:1px solid #f3f4f6;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Order Review</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Our team will review your submission within 1 to 2 business days.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Open the Billing Section</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Sign in to your dashboard and open Billing to view your outstanding invoice.</p>
                         </td>
                       </tr>
 
@@ -173,8 +155,8 @@ export function OrderCreatedEmailHtml({
                           <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">2</div>
                         </td>
                         <td style="padding-top:18px;padding-bottom:18px;border-bottom:1px solid #f3f4f6;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Processing Updates</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">We will keep you informed at every step. We'll reach out if additional information is required.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Submit Your Payment</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Pay by card, or upload your bank transfer receipt directly in the billing section.</p>
                         </td>
                       </tr>
 
@@ -183,8 +165,8 @@ export function OrderCreatedEmailHtml({
                           <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">3</div>
                         </td>
                         <td style="padding-top:18px;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">LLC Formation Complete</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Your LLC will be officially registered and all documents delivered to your dashboard.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">We Proceed Immediately</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">As soon as your payment is confirmed, we continue with the next stage of your order.</p>
                         </td>
                       </tr>
 
@@ -195,13 +177,25 @@ export function OrderCreatedEmailHtml({
             </td>
           </tr>
 
+          <!-- ── Courtesy note ── -->
+          <tr>
+            <td class="fm-pad" style="padding:0 40px 36px;">
+              <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;text-align:center;">
+                If you have already made this payment, please disregard this message, as our records may not yet reflect it. If anything is unclear, simply reply to this email and our team will assist you.
+              </p>
+            </td>
+          </tr>
+
           <!-- ── CTA ── -->
           <tr>
             <td class="fm-pad" align="center" style="padding:0 40px 40px;">
-              <a href="${dashboardUrl}"
+              <a href="${billingUrl}"
                 class="fm-btn" style="display:inline-block;background:#34088f;color:#ffffff;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;letter-spacing:0.02em;">
-                Track Your Order
+                Clear Your Pending Payment
               </a>
+              <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
+                Or visit your <a href="${dashboardUrl}" style="color:#34088f;text-decoration:none;font-weight:500;">dashboard</a> for a full overview.
+              </p>
             </td>
           </tr>
 
@@ -221,7 +215,7 @@ export function OrderCreatedEmailHtml({
                   <td style="padding-top:16px;">
                     <p style="margin:0;font-size:11px;color:#d1d5db;line-height:1.6;">
                       © ${new Date().getFullYear()} Foremint LLC. All rights reserved.<br />
-                      You received this email because you placed an order on Foremint.
+                      You received this email because you have an outstanding balance on a Foremint order.
                     </p>
                   </td>
                 </tr>
@@ -230,7 +224,6 @@ export function OrderCreatedEmailHtml({
           </tr>
 
         </table>
-        <!-- /outer card -->
 
       </td>
     </tr>

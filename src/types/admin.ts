@@ -127,33 +127,20 @@ export interface LlcStats {
   formed: number
 }
 
-export interface PaypalStats {
-  total: number
-  pending: number
-  processing: number
-  completed: number
-}
-
 export interface EarningsBreakdown {
   llcRevenue: number
-  paypalRevenue: number
-  invoiceCommissions: number
   totalEarnings: number
   llcPercent: number       // 0–100
-  paypalPercent: number
-  invoicePercent: number
 }
 
 export interface DailyTrendPoint {
   date: string             // YYYY-MM-DD
   llcOrders: number
-  paypalOrders: number
   totalRevenue: number
 }
 
 export interface OverviewStats {
   llc: LlcStats
-  paypal: PaypalStats
   earnings: EarningsBreakdown
   dailyTrend: DailyTrendPoint[]
   rangeKey: DateRangeFilter
@@ -162,7 +149,7 @@ export interface OverviewStats {
 
 // ─── LLC Registrations List ───────────────────────────────────────────────────
 
-export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'cancelled'
+export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending' | 'cancelled'
 export type PaymentStatus  = 'unpaid'  | 'paid'        | 'partial'
 export type SortDirection  = 'asc' | 'desc'
 export type LlcSortField   = 'created_at' | 'order_number' | 'grand_total'
@@ -189,6 +176,7 @@ export interface LlcTopStats {
   submittedInState: number
   einPending: number
   formed: number
+  paymentPending: number
 }
 
 export interface LlcListFilters {
@@ -211,7 +199,7 @@ export interface LlcListResult {
 
 // ─── Order Detail ─────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed'
+export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending'
 // Note: 'cancelled' exists in DB but is not selectable from the status dropdown UI
 
 export interface MemberIdDocEntry {

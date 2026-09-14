@@ -10,6 +10,7 @@ import { getLlcOrders } from '@/lib/admin/getLlcOrders';
 import { getLlcOrderStats } from '@/lib/admin/getLlcOrderStats';
 
 import LlcListTopStats from './_components/LlcListTopStats';
+import { SendPaymentRemindersButton } from './_components/SendPaymentRemindersButton';
 import LlcListControls from './_components/LlcListControls';
 import LlcOrderTable from './_components/LlcOrderTable';
 import LlcEmptyState from './_components/LlcEmptyState';
@@ -18,7 +19,13 @@ import LlcContentArea from './_components/LlcContentArea';
 import { LlcNavigationProvider } from '@/context/llc-navigation-context';
 import { LlcListFilters, LlcOrderStatus, DateRangeFilter, LlcSortField, SortDirection } from '@/types/admin';
 
-export const revalidate = 60; // Cache listings at route level for up to 60s
+// Rendered per request. A route-level `revalidate` caches the *rendered page*,
+// and revalidateTag() only clears the data caches underneath it — so a status
+// change was invisible here for up to 60s even though the write had landed and
+// every tag had been busted. The underlying queries keep their own tagged
+// unstable_cache layers, which the mutating actions do invalidate, so dropping
+// the route cache costs far less than it looks.
+export const dynamic = 'force-dynamic';
 
 interface PageProps {
  searchParams: Promise<{
@@ -48,7 +55,7 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
  let status: LlcOrderStatus | 'all' = 'all';
  if (
  resolvedParams.status &&
- ['pending', 'initialized', 'submitted_in_state', 'ein_pending', 'formed', 'cancelled'].includes(resolvedParams.status)
+ ['pending', 'initialized', 'submitted_in_state', 'ein_pending', 'formed', 'payment_pending', 'cancelled'].includes(resolvedParams.status)
  ) {
  status = resolvedParams.status as LlcOrderStatus;
  }
@@ -120,6 +127,14 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
 
         {/* Status filter pills — All / Pending / Processing / Formed */}
         <LlcListTopStats stats={stats} activeStatus={status} filters={filters} />
+
+        {/* Bulk reminder trigger — only meaningful while viewing the orders it
+            would email, so it appears with the Payment Pending filter. */}
+        {status === 'payment_pending' && stats.paymentPending > 0 && (
+          <div className="flex justify-end">
+            <SendPaymentRemindersButton adminId={adminUser?.id ?? ''} />
+          </div>
+        )}
 
         {/* Search, date filter, sort, page-size controls */}
         <LlcListControls filters={filters} />

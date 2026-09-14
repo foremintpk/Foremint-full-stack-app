@@ -9,10 +9,10 @@ interface EarningsCardProps {
 const formatUSD = (v: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
 
+// PayPal Accounts and Invoice Commissions were removed from the product, so
+// LLC formation revenue is the only earnings source.
 const ROWS = [
-  { key: 'llcRevenue',         label: 'LLC Formations',      color: '#10b981', pctKey: 'llcPercent' },
-  { key: 'paypalRevenue',      label: 'PayPal Accounts',     color: '#3b82f6', pctKey: 'paypalPercent' },
-  { key: 'invoiceCommissions', label: 'Invoice Commissions', color: '#34088f', pctKey: 'invoicePercent' },
+  { key: 'llcRevenue', label: 'LLC Formations', color: '#10b981', pctKey: 'llcPercent' },
 ] as const;
 
 export function EarningsCard({ earnings }: EarningsCardProps) {

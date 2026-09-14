@@ -1,45 +1,39 @@
-// ─── Customer Order Confirmation Email Template ───────────────────────────────
+// ─── Customer "Registered in State / EIN Pending" Email Template ─────────────
+// Sent when an order moves to `ein_pending`: the state has approved the LLC and
+// the federal EIN filing is now underway.
 
 import { RESPONSIVE_EMAIL_STYLES } from './responsive'
 
-export interface OrderCreatedEmailProps {
+export interface StateRegisteredEmailProps {
   userName: string
   orderNumber: string
   businessName: string
-  grandTotal: number
-  packageName: string
   formationState: string
   dashboardUrl: string
-  orderDate?: string
   logoUrl?: string
 }
 
-export function OrderCreatedEmailHtml({
+export function StateRegisteredEmailHtml({
   userName,
   orderNumber,
   businessName,
-  grandTotal,
-  packageName,
   formationState,
   dashboardUrl,
-  orderDate,
   logoUrl,
-}: OrderCreatedEmailProps): string {
+}: StateRegisteredEmailProps): string {
   const greeting = userName || 'there'
-  const displayDate =
-    orderDate ??
-    new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+  const displayDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LLC Order Confirmation</title>
+  <title>Your LLC Is Registered</title>
   ${RESPONSIVE_EMAIL_STYLES}
 </head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -48,16 +42,13 @@ export function OrderCreatedEmailHtml({
     <tr>
       <td align="center" style="padding:48px 16px 40px;">
 
-        <!-- ── Outer card ── -->
         <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="fm-card"
           style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 8px 32px rgba(0,0,0,0.06);max-width:600px;width:100%;">
 
-          <!-- ── Top accent bar ── -->
           <tr>
             <td style="background:#34088f;height:4px;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
 
-          <!-- ── Logo header ── -->
           <tr>
             <td class="fm-pad" align="center" style="padding:36px 40px 28px;">
               ${logoUrl
@@ -67,7 +58,6 @@ export function OrderCreatedEmailHtml({
             </td>
           </tr>
 
-          <!-- ── Divider ── -->
           <tr>
             <td class="fm-pad" style="padding:0 40px;">
               <div style="height:1px;background:#f3f4f6;"></div>
@@ -77,28 +67,26 @@ export function OrderCreatedEmailHtml({
           <!-- ── Hero ── -->
           <tr>
             <td class="fm-pad fm-hero" style="padding:40px 40px 32px;text-align:center;">
-              <div style="display:inline-block;width:56px;height:56px;background:#f4f0fe;border-radius:16px;line-height:56px;font-size:28px;margin-bottom:20px;">✓</div>
+              <div style="display:inline-block;width:56px;height:56px;background:#f4f0fe;border-radius:16px;line-height:56px;font-size:28px;margin-bottom:20px;">🏛</div>
               <h1 class="fm-h1" style="margin:0 0 12px;font-size:24px;font-weight:700;color:#111827;letter-spacing:-0.4px;line-height:1.3;">
-                Order Received, ${greeting}
+                Your LLC Is Officially Registered
               </h1>
-              <p style="margin:0 auto;font-size:15px;color:#6b7280;line-height:1.7;max-width:420px;">
-                Thank you for choosing Foremint. We have received your LLC formation order and our team is ready to get started.
+              <p style="margin:0 auto;font-size:15px;color:#6b7280;line-height:1.7;max-width:440px;">
+                Good news, ${greeting}. ${businessName ? `<strong style="color:#111827;">${businessName}</strong> has` : 'your company has'} been successfully registered${formationState ? ` in the State of ${formationState}` : ' in your formation state'}. We are now proceeding with your federal filing.
               </p>
             </td>
           </tr>
 
-          <!-- ── Order Summary Card ── -->
+          <!-- ── Status Card ── -->
           <tr>
             <td class="fm-pad" style="padding:0 40px 32px;">
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
                 style="background:#fafafa;border:1px solid #ede9fe;border-radius:10px;overflow:hidden;">
-                <!-- Card header -->
                 <tr>
                   <td class="fm-pad-sm" style="padding:16px 24px;border-bottom:1px solid #ede9fe;background:#f4f0fe;">
-                    <p style="margin:0;font-size:11px;font-weight:700;color:#34088f;letter-spacing:0.12em;text-transform:uppercase;">Order Summary</p>
+                    <p style="margin:0;font-size:11px;font-weight:700;color:#34088f;letter-spacing:0.12em;text-transform:uppercase;">Current Status</p>
                   </td>
                 </tr>
-                <!-- Rows -->
                 <tr>
                   <td class="fm-pad-sm" style="padding:4px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
@@ -109,21 +97,10 @@ export function OrderCreatedEmailHtml({
                         <td style="font-size:12px;font-weight:600;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;font-family:'SF Mono',Menlo,monospace;letter-spacing:0.02em;">#${orderNumber}</td>
                       </tr>` : ''}
 
-                      <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Date</td>
-                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${displayDate}</td>
-                      </tr>
-
                       ${businessName ? `
                       <tr>
                         <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">LLC Name</td>
                         <td style="font-size:13px;font-weight:600;color:#111827;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${businessName}</td>
-                      </tr>` : ''}
-
-                      ${packageName ? `
-                      <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Package</td>
-                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${packageName}</td>
                       </tr>` : ''}
 
                       ${formationState ? `
@@ -133,8 +110,13 @@ export function OrderCreatedEmailHtml({
                       </tr>` : ''}
 
                       <tr>
-                        <td style="font-size:14px;font-weight:700;color:#111827;padding:14px 0 6px;">Total</td>
-                        <td class="fm-amount" style="font-size:22px;font-weight:800;color:#34088f;text-align:right;padding:14px 0 6px;letter-spacing:-0.5px;">$${grandTotal.toLocaleString()}</td>
+                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Updated</td>
+                        <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${displayDate}</td>
+                      </tr>
+
+                      <tr>
+                        <td style="font-size:14px;font-weight:700;color:#111827;padding:14px 0 6px;">Stage</td>
+                        <td style="font-size:14px;font-weight:700;color:#34088f;text-align:right;padding:14px 0 6px;">EIN Pending</td>
                       </tr>
 
                     </table>
@@ -160,11 +142,11 @@ export function OrderCreatedEmailHtml({
 
                       <tr>
                         <td width="32" valign="top" style="padding-right:14px;padding-bottom:18px;">
-                          <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">1</div>
+                          <div style="width:26px;height:26px;background:#10b981;border-radius:8px;text-align:center;line-height:26px;font-size:13px;font-weight:700;color:#ffffff;">✓</div>
                         </td>
                         <td style="padding-bottom:18px;border-bottom:1px solid #f3f4f6;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Order Review</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Our team will review your submission within 1 to 2 business days.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">State Registration Complete</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Your LLC is now a legally recognised entity${formationState ? ` in ${formationState}` : ''}.</p>
                         </td>
                       </tr>
 
@@ -173,18 +155,18 @@ export function OrderCreatedEmailHtml({
                           <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">2</div>
                         </td>
                         <td style="padding-top:18px;padding-bottom:18px;border-bottom:1px solid #f3f4f6;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Processing Updates</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">We will keep you informed at every step. We'll reach out if additional information is required.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">Federal EIN Filing In Progress</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">We have begun your federal filing and are awaiting the issuance of your EIN letter from the IRS.</p>
                         </td>
                       </tr>
 
                       <tr>
                         <td width="32" valign="top" style="padding-right:14px;padding-top:18px;">
-                          <div style="width:26px;height:26px;background:#34088f;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#ffffff;">3</div>
+                          <div style="width:26px;height:26px;background:#e5e7eb;border-radius:8px;text-align:center;line-height:26px;font-size:11px;font-weight:700;color:#9ca3af;">3</div>
                         </td>
                         <td style="padding-top:18px;">
-                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">LLC Formation Complete</p>
-                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Your LLC will be officially registered and all documents delivered to your dashboard.</p>
+                          <p style="margin:0 0 3px;font-size:13px;font-weight:600;color:#111827;">EIN Received &amp; Formation Complete</p>
+                          <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">Once your EIN letter arrives, we will notify you and deliver every document to your dashboard.</p>
                         </td>
                       </tr>
 
@@ -195,12 +177,21 @@ export function OrderCreatedEmailHtml({
             </td>
           </tr>
 
+          <!-- ── Reassurance note ── -->
+          <tr>
+            <td class="fm-pad" style="padding:0 40px 36px;">
+              <p style="margin:0;font-size:13px;color:#6b7280;line-height:1.7;text-align:center;">
+                No action is required from you at this stage. We will keep you updated step by step as your filing progresses.
+              </p>
+            </td>
+          </tr>
+
           <!-- ── CTA ── -->
           <tr>
             <td class="fm-pad" align="center" style="padding:0 40px 40px;">
               <a href="${dashboardUrl}"
                 class="fm-btn" style="display:inline-block;background:#34088f;color:#ffffff;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;letter-spacing:0.02em;">
-                Track Your Order
+                View Your Dashboard
               </a>
             </td>
           </tr>
@@ -221,7 +212,7 @@ export function OrderCreatedEmailHtml({
                   <td style="padding-top:16px;">
                     <p style="margin:0;font-size:11px;color:#d1d5db;line-height:1.6;">
                       © ${new Date().getFullYear()} Foremint LLC. All rights reserved.<br />
-                      You received this email because you placed an order on Foremint.
+                      You received this email because you have an active order with Foremint.
                     </p>
                   </td>
                 </tr>
@@ -230,7 +221,6 @@ export function OrderCreatedEmailHtml({
           </tr>
 
         </table>
-        <!-- /outer card -->
 
       </td>
     </tr>
