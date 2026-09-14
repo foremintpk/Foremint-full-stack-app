@@ -12,13 +12,14 @@
 import { cache } from 'react';
 import { getSessionSafe } from '@/lib/auth/get-session';
 import { AdminProfile } from '@/types/admin';
+import { isStaffRole } from '@/lib/auth/permissions';
 
 export const getAdminUser = cache(async (): Promise<AdminProfile | null> => {
   const session = await getSessionSafe();
   if (!session) return null;
   
   const { profile } = session;
-  if (profile.role !== 'administrator' && profile.role !== 'manager') {
+  if (!isStaffRole(profile.role)) {
     return null;
   }
 

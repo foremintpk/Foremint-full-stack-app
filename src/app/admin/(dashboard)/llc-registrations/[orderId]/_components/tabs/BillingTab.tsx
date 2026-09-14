@@ -293,7 +293,8 @@ export function BillingTab({
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-bold text-gray-900 font-manrope">{entry.title}</p>
                         <p className="text-[10px] text-gray-400 font-inter">
-                          {cfg.label} · {new Date(entry.createdAt).toLocaleDateString()}
+                          {cfg.label} · {/* locale-dependent: identical value, formatted per client */}
+                <span suppressHydrationWarning>{new Date(entry.createdAt).toLocaleDateString()}</span>
                         </p>
                       </div>
                       <span className={`text-sm font-black font-manrope ${entry.type === 'charge' ? 'text-red-500' : 'text-emerald-600'}`}>

@@ -56,7 +56,7 @@ function CustomLegend({ payload }: any) {
 }
 
 export function OrderTrendChart({ data }: OrderTrendChartProps) {
-  const hasData = data.some((d) => d.llcOrders > 0 || d.paypalOrders > 0);
+  const hasData = data.some((d) => d.llcOrders > 0);
 
   if (!hasData) {
     return (
@@ -69,7 +69,6 @@ export function OrderTrendChart({ data }: OrderTrendChartProps) {
   const chartData = data.map((d) => ({
     ...d,
     LLC: d.llcOrders,
-    PayPal: d.paypalOrders,
   }));
 
   // Downsample to max 30 points so the x-axis stays readable
@@ -84,10 +83,6 @@ export function OrderTrendChart({ data }: OrderTrendChartProps) {
           <linearGradient id="gradLLC" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.18} />
             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-          </linearGradient>
-          <linearGradient id="gradPayPal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.18} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -117,16 +112,6 @@ export function OrderTrendChart({ data }: OrderTrendChartProps) {
           fill="url(#gradLLC)"
           dot={false}
           activeDot={{ r: 4, strokeWidth: 0, fill: '#3b82f6' }}
-        />
-        <Area
-          type="monotone"
-          dataKey="PayPal"
-          name="PayPal Orders"
-          stroke="#10b981"
-          strokeWidth={2.5}
-          fill="url(#gradPayPal)"
-          dot={false}
-          activeDot={{ r: 4, strokeWidth: 0, fill: '#10b981' }}
         />
       </AreaChart>
     </ResponsiveContainer>

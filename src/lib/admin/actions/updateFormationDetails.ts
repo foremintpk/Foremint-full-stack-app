@@ -20,7 +20,7 @@ export async function updateFormationDetails(
 
     // 1. Enforce RBAC access check
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized: Admin or Manager role required' };
     }
 

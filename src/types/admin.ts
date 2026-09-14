@@ -8,7 +8,7 @@
  * 4. Revalidation / Cache Busting: N/A.
  */
 
-export type AdminRole = 'administrator' | 'manager'
+export type AdminRole = 'administrator' | 'manager' | 'account_manager'
 
 export interface AdminProfile {
   id: string
@@ -38,6 +38,11 @@ export interface NavItem {
   href: string
   icon: string
   badgeKey?: keyof BadgeCounts
+  /**
+   * Roles allowed to see this item. Omitted means every admin role, which is
+   * the behaviour every existing item relies on.
+   */
+  roles?: AdminRole[]
 }
 
 export interface BadgeCounts {
@@ -76,6 +81,8 @@ export interface Coupon {
   totalUses: number
   usedCount: number
   perUserUses: number
+  /** US state codes the coupon is limited to. Empty = valid in every state. */
+  allowedStates: string[]
   status: CouponStatus
   createdAt: string
   updatedAt: string
@@ -120,33 +127,20 @@ export interface LlcStats {
   formed: number
 }
 
-export interface PaypalStats {
-  total: number
-  pending: number
-  processing: number
-  completed: number
-}
-
 export interface EarningsBreakdown {
   llcRevenue: number
-  paypalRevenue: number
-  invoiceCommissions: number
   totalEarnings: number
   llcPercent: number       // 0–100
-  paypalPercent: number
-  invoicePercent: number
 }
 
 export interface DailyTrendPoint {
   date: string             // YYYY-MM-DD
   llcOrders: number
-  paypalOrders: number
   totalRevenue: number
 }
 
 export interface OverviewStats {
   llc: LlcStats
-  paypal: PaypalStats
   earnings: EarningsBreakdown
   dailyTrend: DailyTrendPoint[]
   rangeKey: DateRangeFilter
@@ -155,7 +149,7 @@ export interface OverviewStats {
 
 // ─── LLC Registrations List ───────────────────────────────────────────────────
 
-export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'cancelled'
+export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending' | 'cancelled'
 export type PaymentStatus  = 'unpaid'  | 'paid'        | 'partial'
 export type SortDirection  = 'asc' | 'desc'
 export type LlcSortField   = 'created_at' | 'order_number' | 'grand_total'
@@ -182,6 +176,7 @@ export interface LlcTopStats {
   submittedInState: number
   einPending: number
   formed: number
+  paymentPending: number
 }
 
 export interface LlcListFilters {
@@ -204,7 +199,7 @@ export interface LlcListResult {
 
 // ─── Order Detail ─────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed'
+export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending'
 // Note: 'cancelled' exists in DB but is not selectable from the status dropdown UI
 
 export interface MemberIdDocEntry {
@@ -409,7 +404,12 @@ export interface Package {
 
 // ─── Users Management System (Chunk 4G) ──────────────────────────────────────────
 
-export type UserRole = 'administrator' | 'manager' | 'customer' | 'b2b_customer'
+export type UserRole =
+  | 'administrator'
+  | 'manager'
+  | 'account_manager'
+  | 'customer'
+  | 'b2b_customer'
 
 export interface AdminUser {
   id: string

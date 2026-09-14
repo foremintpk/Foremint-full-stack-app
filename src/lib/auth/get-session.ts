@@ -83,6 +83,9 @@ export function getRoleRedirect(role: UserRole): Route {
     case "administrator":
     case "manager":
       return "/admin";
+    case "account_manager":
+      // Straight to the only section they work in.
+      return "/admin/llc-registrations";
     case "customer":
     case "b2b_customer":
     default:

@@ -355,8 +355,13 @@ export function NotificationsTab({
                           </div>
                           {n.body && <p className="text-[11px] text-gray-500 font-inter leading-relaxed">{n.body}</p>}
                           <p className="text-[9px] text-gray-400 font-inter mt-1">
-                            {new Date(n.createdAt).toLocaleDateString()}
-                            {n.expiresAt && ` · Expires ${new Date(n.expiresAt).toLocaleDateString()}`}
+                            {/* locale-dependent: identical value, formatted per client */}
+                <span suppressHydrationWarning>{new Date(n.createdAt).toLocaleDateString()}</span>
+                            {n.expiresAt && (
+                              <span suppressHydrationWarning>
+                                {` · Expires ${new Date(n.expiresAt).toLocaleDateString()}`}
+                              </span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -423,7 +428,8 @@ export function NotificationsTab({
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-gray-900 font-manrope truncate">{ticket.subject}</p>
                             <p className="text-[10px] text-gray-400 font-inter">
-                              {ticket.messageCount} messages · {new Date(ticket.updatedAt).toLocaleDateString()}
+                              {ticket.messageCount} messages · {/* locale-dependent: identical value, formatted per client */}
+                <span suppressHydrationWarning>{new Date(ticket.updatedAt).toLocaleDateString()}</span>
                             </p>
                           </div>
                         </div>

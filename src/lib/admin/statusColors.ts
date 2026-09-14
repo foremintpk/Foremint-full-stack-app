@@ -14,6 +14,7 @@ export const STATUS_COLORS = {
   submitted_in_state: '#8b5cf6',
   ein_pending:        '#f97316',
   formed:             '#10b981',
+  payment_pending:    '#dc2626',
   cancelled:          '#ef4444',
   unpaid:             '#f59e0b',
   paid:               '#10b981',

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { REQUIRED_DOCUMENT_TYPES } from '@/lib/onboarding/document-slots';
 import { sendWelcomeEmail } from '@/lib/onboarding/complete-onboarding';
+import { createAdminNotification } from '@/lib/notifications/createAdminNotification';
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -57,11 +58,25 @@ export async function POST(req: NextRequest) {
   }
 
   // ─── Notify admin (insert a notification row) ────────────────────────────
-  (supabase.from('notifications') as any).insert({
+  // Awaited, not fire-and-forget: the previous version discarded the promise,
+  // so the RLS rejection was never observed and admins silently lost these.
+  // Service-role write — see createAdminNotification for why.
+  const notifResult = await createAdminNotification({
     type: 'onboarding_completed',
-    target_role: 'administrator',
+    title: 'Onboarding Completed',
+    body: `${user.email ?? 'A customer'} finished onboarding.`,
+    link: '/admin/overview',
     payload: { profile_id: user.sub, email: user.email },
-  }).then(() => {}).catch(console.error); // non-blocking
+  });
+
+  if (!notifResult.ok) {
+    // Onboarding itself succeeded; the notification is secondary, so report
+    // success to the customer while leaving a trace for operators.
+    console.error('[onboarding/complete] admin notification failed', {
+      profileId: user.sub,
+      error: notifResult.error,
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

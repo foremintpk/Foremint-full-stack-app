@@ -1,5 +1,7 @@
 // ─── Admin Order Notification Email Template ──────────────────────────────────
 
+import { RESPONSIVE_EMAIL_STYLES } from './responsive'
+
 export interface AdminOrderNotificationProps {
   customerName: string
   customerEmail: string
@@ -35,6 +37,7 @@ export function AdminOrderNotificationHtml({
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>New LLC Order Received — Foremint Admin</title>
+  ${RESPONSIVE_EMAIL_STYLES}
 </head>
 <body style="margin:0;padding:0;background:#f0f2f5;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
 
@@ -43,7 +46,7 @@ export function AdminOrderNotificationHtml({
       <td align="center" style="padding:48px 16px 40px;">
 
         <!-- ── Outer card ── -->
-        <table width="600" cellpadding="0" cellspacing="0" role="presentation"
+        <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="fm-card"
           style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08),0 8px 32px rgba(0,0,0,0.06);max-width:600px;width:100%;">
 
           <!-- ── Top accent bar ── -->
@@ -53,7 +56,7 @@ export function AdminOrderNotificationHtml({
 
           <!-- ── Logo header ── -->
           <tr>
-            <td align="center" style="padding:32px 40px 24px;background:#111827;">
+            <td class="fm-pad" align="center" style="padding:32px 40px 24px;background:#111827;">
               ${logoUrl
                 ? `<img src="${logoUrl}" alt="Foremint" width="130" style="height:auto;display:block;margin:0 auto;" />`
                 : `<p style="margin:0;font-size:20px;font-weight:800;color:#ffffff;font-family:Georgia,serif;letter-spacing:-0.5px;">Foremint</p>`
@@ -64,7 +67,7 @@ export function AdminOrderNotificationHtml({
 
           <!-- ── Alert Banner ── -->
           <tr>
-            <td style="background:#fffbeb;padding:14px 40px;border-bottom:1px solid #fde68a;">
+            <td class="fm-pad" style="background:#fffbeb;padding:14px 40px;border-bottom:1px solid #fde68a;">
               <table cellpadding="0" cellspacing="0" role="presentation">
                 <tr>
                   <td style="padding-right:10px;font-size:16px;line-height:1;">📩</td>
@@ -78,7 +81,7 @@ export function AdminOrderNotificationHtml({
 
           <!-- ── Body ── -->
           <tr>
-            <td style="padding:36px 40px 32px;">
+            <td class="fm-pad" style="padding:36px 40px 32px;">
               <p style="margin:0 0 28px;font-size:14px;color:#6b7280;line-height:1.75;">
                 A new LLC order has been submitted and is awaiting review in the admin dashboard.
               </p>
@@ -87,12 +90,12 @@ export function AdminOrderNotificationHtml({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
                 style="background:#fafafa;border:1px solid #ede9fe;border-radius:10px;overflow:hidden;margin-bottom:16px;">
                 <tr>
-                  <td style="padding:14px 24px;border-bottom:1px solid #ede9fe;background:#f4f0fe;">
+                  <td class="fm-pad-sm" style="padding:14px 24px;border-bottom:1px solid #ede9fe;background:#f4f0fe;">
                     <p style="margin:0;font-size:11px;font-weight:700;color:#34088f;letter-spacing:0.12em;text-transform:uppercase;">Customer</p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:4px 24px;">
+                  <td class="fm-pad-sm" style="padding:4px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                       <tr>
                         <td style="font-size:13px;color:#9ca3af;padding:10px 0;border-bottom:1px solid #f3f4f6;">Name</td>
@@ -113,12 +116,12 @@ export function AdminOrderNotificationHtml({
               <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
                 style="background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:28px;">
                 <tr>
-                  <td style="padding:14px 24px;border-bottom:1px solid #e5e7eb;">
+                  <td class="fm-pad-sm" style="padding:14px 24px;border-bottom:1px solid #e5e7eb;">
                     <p style="margin:0;font-size:11px;font-weight:700;color:#374151;letter-spacing:0.12em;text-transform:uppercase;">Order Details</p>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:4px 24px;">
+                  <td class="fm-pad-sm" style="padding:4px 24px;">
                     <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
                       <tr>
                         <td style="font-size:13px;color:#9ca3af;padding:10px 0;border-bottom:1px solid #f3f4f6;">Order ID</td>
@@ -146,7 +149,7 @@ export function AdminOrderNotificationHtml({
                       ${grandTotal !== undefined ? `
                       <tr>
                         <td style="font-size:14px;font-weight:700;color:#111827;padding:14px 0 6px;">Order Total</td>
-                        <td style="font-size:22px;font-weight:800;color:#34088f;text-align:right;padding:14px 0 6px;letter-spacing:-0.5px;">$${grandTotal.toLocaleString()}</td>
+                        <td class="fm-amount" style="font-size:22px;font-weight:800;color:#34088f;text-align:right;padding:14px 0 6px;letter-spacing:-0.5px;">$${grandTotal.toLocaleString()}</td>
                       </tr>` : ''}
                     </table>
                   </td>
@@ -163,7 +166,7 @@ export function AdminOrderNotificationHtml({
 
           <!-- ── Footer ── -->
           <tr>
-            <td style="padding:20px 40px;border-top:1px solid #f3f4f6;background:#fafafa;">
+            <td class="fm-pad" style="padding:20px 40px;border-top:1px solid #f3f4f6;background:#fafafa;">
               <p style="margin:0;font-size:11px;color:#d1d5db;line-height:1.6;">
                 Automated admin notification from Foremint. Do not reply to this email.<br />
                 © ${new Date().getFullYear()} Foremint LLC. All rights reserved.

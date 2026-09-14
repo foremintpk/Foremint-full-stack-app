@@ -42,6 +42,8 @@ next-env.d.ts
 
 # scratch / investigation artifacts
 /scratch/
+# ad-hoc test harnesses and captures, named with a leading underscore
+/_*
 
 # migration tool runtime artifacts (logs, report, state ledger)
 /migrations/wordpress

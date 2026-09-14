@@ -46,6 +46,7 @@ async function fetchLlcOrderStats(
   let submittedInState = 0;
   let einPending = 0;
   let formed = 0;
+  let paymentPending = 0;
 
   orders.forEach((o) => {
     const s = o.status;
@@ -54,9 +55,10 @@ async function fetchLlcOrderStats(
     else if (s === 'submitted_in_state') submittedInState++;
     else if (s === 'ein_pending') einPending++;
     else if (s === 'formed') formed++;
+    else if (s === 'payment_pending') paymentPending++;
   });
 
-  return { total, pending, initialized, submittedInState, einPending, formed };
+  return { total, pending, initialized, submittedInState, einPending, formed, paymentPending };
 }
 
 export async function getCachedLlcOrderStats(

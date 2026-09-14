@@ -13,15 +13,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await req.json() as { code?: string; subtotal?: number }
+    const body = await req.json() as {
+      code?: string
+      subtotal?: number
+      formationState?: string | null
+    }
     const code = body.code?.trim() || ''
     const subtotal = Number(body.subtotal || 0)
+    const formationState = body.formationState?.trim() || null
 
     const supabase = createAdminClient()
     const result = await validateCoupon(supabase, {
       code,
       userId: user.sub,
       subtotal,
+      formationState,
     })
 
     if ('error' in result) {

@@ -44,6 +44,14 @@ const BADGE_STYLES: Record<LlcOrderStatus, StatusStyle> = {
     border: 'border-[#a7f3d0]',
     label: 'Formed',
   },
+  // Rose tint, matching the "amount due" capsules elsewhere in the dashboard so
+  // the whole payment-outstanding story reads as one colour family.
+  payment_pending: {
+    bg: 'bg-[#fff1f2]',
+    text: 'text-[#e11d48]',
+    border: 'border-[#fecdd3]',
+    label: 'Payment Pending',
+  },
   cancelled: {
     bg: 'bg-[#fee2e2]',
     text: 'text-[#991b1b]',

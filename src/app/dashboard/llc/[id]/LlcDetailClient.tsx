@@ -16,10 +16,10 @@ import {
 
 // ── Tab Configuration ──────────────────────────────────────────────────────
 const TABS = [
-  { key: 'overview',  label: 'Overview',  icon: Building2 },
+  { key: 'overview', label: 'Overview', icon: Building2 },
   { key: 'documents', label: 'Documents', icon: FileText },
-  { key: 'billing',   label: 'Billing',   icon: CreditCard },
-  { key: 'addons',    label: 'Add-ons',   icon: Users },
+  { key: 'billing', label: 'Billing', icon: CreditCard },
+  { key: 'addons', label: 'Add-ons', icon: Users },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -27,16 +27,26 @@ type TabKey = typeof TABS[number]['key'];
 // ── Status helpers ──────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    pending:            { label: 'Pending',        cls: 'bg-amber-100 text-amber-700' },
-    confirmed:          { label: 'Confirmed',      cls: 'bg-blue-100 text-blue-700' },
-    processing:         { label: 'Processing',     cls: 'bg-indigo-100 text-indigo-700' },
-    completed:          { label: 'Active',          cls: 'bg-emerald-100 text-emerald-700' },
-    awaiting_documents: { label: 'Docs Needed',    cls: 'bg-orange-100 text-orange-700' },
-    awaiting_payment:   { label: 'Payment Needed', cls: 'bg-rose-100 text-rose-700' },
-    formed:             { label: 'Formed',         cls: 'bg-emerald-100 text-emerald-700' },
-    cancelled:          { label: 'Cancelled',      cls: 'bg-gray-100 text-gray-500' },
+    pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-700' },
+    confirmed: { label: 'Confirmed', cls: 'bg-blue-100 text-blue-700' },
+    processing: { label: 'Processing', cls: 'bg-indigo-100 text-indigo-700' },
+    completed: { label: 'Active', cls: 'bg-emerald-100 text-emerald-700' },
+    awaiting_documents: { label: 'Docs Needed', cls: 'bg-orange-100 text-orange-700' },
+    awaiting_payment: { label: 'Payment Needed', cls: 'bg-rose-100 text-rose-700' },
+    // Order-status values. These were absent, so they rendered as raw keys
+    // ("submitted_in_state") through the fallback below.
+    initialized: { label: 'Initialized', cls: 'bg-blue-100 text-blue-700' },
+    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-700' },
+    ein_pending: { label: 'EIN Pending', cls: 'bg-orange-100 text-orange-700' },
+    formed: { label: 'Formed', cls: 'bg-emerald-100 text-emerald-700' },
+    payment_pending: { label: 'Payment Pending', cls: 'bg-rose-50 text-rose-600' },
+    cancelled: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-500' },
   };
-  const cfg = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
+  // Humanise unmapped values rather than printing the raw enum key.
+  const cfg = map[status] ?? {
+    label: status.replace(/_/g, ' '),
+    cls: 'bg-gray-100 text-gray-600',
+  };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope ${cfg.cls}`}>
       {cfg.label}
@@ -46,8 +56,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function PaymentStatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    paid:    { label: 'Paid',    cls: 'bg-emerald-100 text-emerald-700' },
-    unpaid:  { label: 'Unpaid',  cls: 'bg-rose-100 text-rose-700' },
+    paid: { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' },
+    unpaid: { label: 'Unpaid', cls: 'bg-rose-100 text-rose-700' },
     partial: { label: 'Partial', cls: 'bg-amber-100 text-amber-700' },
   };
   const cfg = map[status] ?? { label: status, cls: 'bg-gray-100 text-gray-600' };
@@ -157,10 +167,10 @@ export default function LlcDetailClient({ llc, userId, activeTab, readOnly = fal
 
       {/* Tab content */}
       <div>
-        {tab === 'overview'  && <OverviewTab llc={llc} />}
+        {tab === 'overview' && <OverviewTab llc={llc} />}
         {tab === 'documents' && <DocumentsTab llc={llc} userId={userId} readOnly={readOnly} />}
-        {tab === 'billing'   && <BillingTab llc={llc} userId={userId} readOnly={readOnly} />}
-        {tab === 'addons'    && <AddonsTab llc={llc} />}
+        {tab === 'billing' && <BillingTab llc={llc} userId={userId} readOnly={readOnly} />}
+        {tab === 'addons' && <AddonsTab llc={llc} />}
       </div>
     </div>
   );
@@ -268,8 +278,8 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
     d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
 
   const businessAddr = cd?.businessAddress || step3.businessAddress || null;
-  const mailingAddr  = cd?.mailingAddress  || null;
-  const tradingAddr  = cd?.tradingAddress  || null;
+  const mailingAddr = cd?.mailingAddress || null;
+  const tradingAddr = cd?.tradingAddress || null;
 
   const hasAnyAddress = [businessAddr, mailingAddr, tradingAddr].some(
     a => a && Object.values(a).some(Boolean)
@@ -300,8 +310,8 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
           {hasAnyAddress ? (
             <div className="space-y-6">
               <AddressSection title="Business Address" address={businessAddr} />
-              <AddressSection title="Mailing Address"  address={mailingAddr} />
-              <AddressSection title="Trading Address"  address={tradingAddr} />
+              <AddressSection title="Mailing Address" address={mailingAddr} />
+              <AddressSection title="Trading Address" address={tradingAddr} />
             </div>
           ) : (
             <p className="text-sm text-gray-400 font-inter italic">No addresses on file yet.</p>
@@ -406,8 +416,8 @@ function OverviewTab({ llc }: { llc: OrderDetail }) {
 // Mirrors admin DocumentsTab PRIMARY_SLOTS exactly — slot_key is the source of truth.
 const PRIMARY_SLOT_LABELS: Record<string, string> = {
   articles_of_organization: 'Articles of Organization',
-  operating_agreement:      'Operating Agreement',
-  ein_letter:               'EIN Confirmation Letter',
+  operating_agreement: 'Operating Agreement',
+  ein_letter: 'EIN Confirmation Letter',
 };
 const PRIMARY_SLOT_KEYS = new Set(Object.keys(PRIMARY_SLOT_LABELS));
 
@@ -501,10 +511,10 @@ function DocumentsTab({ llc, userId, readOnly = false }: { llc: OrderDetail; use
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const router = useRouter();
 
-  const activeDocs     = llc.documents.filter(d => d.isActive !== false);
-  const primaryDocs    = activeDocs.filter(d => docCategory(d) === 'primary');
+  const activeDocs = llc.documents.filter(d => d.isActive !== false);
+  const primaryDocs = activeDocs.filter(d => docCategory(d) === 'primary');
   const additionalDocs = activeDocs.filter(d => docCategory(d) === 'additional');
-  const visibleDocs    = primaryDocs.length + additionalDocs.length;
+  const visibleDocs = primaryDocs.length + additionalDocs.length;
 
   const pendingResubmissions = llc.resubmissionRequests.filter(r => r.status === 'pending');
 
@@ -551,9 +561,8 @@ function DocumentsTab({ llc, userId, readOnly = false }: { llc: OrderDetail; use
                   </div>
                 ) : (
                   <label className="mt-3 flex items-center gap-2 cursor-pointer w-fit">
-                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                      uploading === req.fieldName ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#34088f] text-white hover:bg-[#2a0673]'
-                    }`}>
+                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-colors ${uploading === req.fieldName ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-[#34088f] text-white hover:bg-[#2a0673]'
+                      }`}>
                       {uploading === req.fieldName
                         ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading...</>
                         : <><Upload className="w-3.5 h-3.5" /> Upload Replacement</>}
@@ -609,17 +618,17 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
   // Base Total = order.grandTotal (coupon already baked in).
   // effective   = grandTotal + charges − discounts
   // pending     = max(0, effective − payments)
-  const entries        = llc.billingEntries || [];
+  const entries = llc.billingEntries || [];
   const couponDiscount = llc.couponDiscount || 0;
-  const chargesTotal   = entries.filter(e => e.type === 'charge').reduce((s, e) => s + e.amount, 0);
+  const chargesTotal = entries.filter(e => e.type === 'charge').reduce((s, e) => s + e.amount, 0);
   const discountsTotal = entries.filter(e => e.type === 'discount').reduce((s, e) => s + e.amount, 0);
-  const paymentsTotal  = entries.filter(e => e.type === 'payment').reduce((s, e) => s + e.amount, 0);
+  const paymentsTotal = entries.filter(e => e.type === 'payment').reduce((s, e) => s + e.amount, 0);
 
-  const baseTotal   = llc.grandTotal;
-  const effective   = baseTotal + chargesTotal - discountsTotal;
-  const pendingAmt  = Math.max(0, effective - paymentsTotal);
-  const isPaid      = pendingAmt <= 0;
-  const receiptDoc  = llc.documents.find(d => d.slotKey === 'payment_receipt' && d.isActive !== false);
+  const baseTotal = llc.grandTotal;
+  const effective = baseTotal + chargesTotal - discountsTotal;
+  const pendingAmt = Math.max(0, effective - paymentsTotal);
+  const isPaid = pendingAmt <= 0;
+  const receiptDoc = llc.documents.find(d => d.slotKey === 'payment_receipt' && d.isActive !== false);
 
   const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -657,9 +666,8 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
             <h3 className="text-sm font-black text-gray-900 font-manrope">Payment Summary</h3>
           </div>
           {/* Status + pending badge */}
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider font-manrope ${
-            isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-          }`}>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider font-manrope ${isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+            }`}>
             {isPaid ? 'Paid' : <>Unpaid · {fmt(pendingAmt)}</>}
           </span>
         </div>
@@ -667,9 +675,9 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
         <div className="px-6 py-4 space-y-0">
           {/* Base order fees */}
           {[
-            { label: 'Package Fee',   value: llc.packagePrice },
+            { label: 'Package Fee', value: llc.packagePrice },
             { label: 'Add-ons Total', value: llc.addonsTotal },
-            { label: 'State Fee',     value: llc.stateFee },
+            { label: 'State Fee', value: llc.stateFee },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between py-3 border-b border-gray-50">
               <span className="text-sm text-gray-500 font-inter">{label}</span>
@@ -705,9 +713,8 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
                       {e.type === 'charge' ? 'Charge' : e.type === 'discount' ? 'Discount' : 'Payment'}
                     </span>
                   </span>
-                  <span className={`text-sm font-semibold font-manrope ${
-                    e.type === 'charge' ? 'text-red-500' : 'text-emerald-600'
-                  }`}>
+                  <span className={`text-sm font-semibold font-manrope ${e.type === 'charge' ? 'text-red-500' : 'text-emerald-600'
+                    }`}>
                     {e.type === 'charge' ? '+' : '-'}{fmt(e.amount)}
                   </span>
                 </div>
@@ -746,11 +753,10 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
       {!readOnly && !isPaid && (
         <Card title="Complete Payment" icon={DollarSign}>
           {result && (
-            <div className={`mb-5 p-3 rounded-xl text-xs font-inter ${
-              result.type === 'success'
+            <div className={`mb-5 p-3 rounded-xl text-xs font-inter ${result.type === 'success'
                 ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
                 : 'bg-red-50 border border-red-200 text-red-600'
-            }`}>{result.msg}</div>
+              }`}>{result.msg}</div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -762,10 +768,10 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
               </div>
               <div className="rounded-xl bg-gray-50 p-4 space-y-2 text-xs font-inter">
                 {[
-                  { label: 'Bank',      value: 'Meezan Bank' },
-                  { label: 'Acc Title', value: 'SYED ABDULLAH BUKHARI' },
-                  { label: 'Acc No',    value: '00300112453884' },
-                  { label: 'IBAN',      value: 'PK74MEZN0000300112453884' },
+                  { label: 'Bank', value: 'United Bank Limited (UBL)' },
+                  { label: 'Acc Title', value: 'ForeMint' },
+                  { label: 'Acc No', value: '2369385556044' },
+                  { label: 'IBAN', value: 'PK03UNIL0109000385556044' },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-start justify-between gap-2">
                     <span className="text-gray-400 flex-shrink-0 w-20">{label}</span>
@@ -778,9 +784,8 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
                   Transfer the pending amount and upload your bank receipt below.
                 </p>
                 <label className="cursor-pointer block">
-                  <div className={`flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-semibold border transition-colors ${
-                    uploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'bg-[#34088f] text-white hover:bg-[#2a0673] border-transparent'
-                  }`}>
+                  <div className={`flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-xs font-semibold border transition-colors ${uploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' : 'bg-[#34088f] text-white hover:bg-[#2a0673] border-transparent'
+                    }`}>
                     {uploading ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading...</> : <><Upload className="w-3.5 h-3.5" /> Upload Receipt</>}
                   </div>
                   <input type="file" className="hidden" accept="image/*,.pdf" disabled={uploading}
@@ -826,10 +831,10 @@ function BillingTab({ llc, userId, readOnly = false }: { llc: OrderDetail; userI
 // ═══════════════════════════════════════════════════════════════════════════
 
 const ADDON_STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  pending:    { label: 'Pending',    cls: 'bg-amber-100 text-amber-700' },
+  pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-700' },
   in_process: { label: 'In Process', cls: 'bg-blue-100 text-blue-700' },
-  completed:  { label: 'Completed',  cls: 'bg-emerald-100 text-emerald-700' },
-  failed:     { label: 'Failed',     cls: 'bg-red-100 text-red-700' },
+  completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
+  failed: { label: 'Failed', cls: 'bg-red-100 text-red-700' },
 };
 
 function AddonStatusBadge({ status }: { status?: string }) {
@@ -856,10 +861,10 @@ function AddonsTab({ llc }: { llc: OrderDetail }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {addons.map((addon, i) => {
-        const r       = addon as Record<string, any>;
-        const name    = r.name    || r.title       || 'Add-on';
-        const price   = Number(r.price   || 0);
-        const status  = r.status  || 'pending';
+        const r = addon as Record<string, any>;
+        const name = r.name || r.title || 'Add-on';
+        const price = Number(r.price || 0);
+        const status = r.status || 'pending';
         const details = r.details || r.description || r.desc || null;
         const features: string[] = Array.isArray(r.features) ? r.features : [];
 
@@ -945,18 +950,16 @@ function ComplianceTab({ llc }: { llc: OrderDetail }) {
         <div className="space-y-4">
           {items.map((item, idx) => (
             <div key={idx} className="flex items-start gap-4 py-3 border-b border-gray-50 last:border-0">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                item.status === 'done' ? 'bg-emerald-100' :
-                item.status === 'warning' ? 'bg-amber-100' : 'bg-gray-100'
-              }`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${item.status === 'done' ? 'bg-emerald-100' :
+                  item.status === 'warning' ? 'bg-amber-100' : 'bg-gray-100'
+                }`}>
                 {item.status === 'done' ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> :
-                 item.status === 'warning' ? <AlertTriangle className="w-4 h-4 text-amber-600" /> :
-                 <Clock className="w-4 h-4 text-gray-400" />}
+                  item.status === 'warning' ? <AlertTriangle className="w-4 h-4 text-amber-600" /> :
+                    <Clock className="w-4 h-4 text-gray-400" />}
               </div>
               <div>
-                <p className={`text-sm font-semibold font-manrope ${
-                  item.status === 'done' ? 'text-gray-900' : 'text-gray-600'
-                }`}>{item.label}</p>
+                <p className={`text-sm font-semibold font-manrope ${item.status === 'done' ? 'text-gray-900' : 'text-gray-600'
+                  }`}>{item.label}</p>
                 <p className="text-xs text-gray-500 font-inter mt-0.5">{item.detail}</p>
               </div>
             </div>
@@ -1006,9 +1009,8 @@ function ActivityTab({ llc }: { llc: OrderDetail }) {
             {llc.statusHistory.map((entry, idx) => (
               <div key={entry.id} className="relative flex gap-4 pl-4">
                 {/* Dot */}
-                <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  idx === 0 ? 'bg-[#34088f] ring-4 ring-[#34088f]/10' : 'bg-white border-2 border-gray-200'
-                }`}>
+                <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${idx === 0 ? 'bg-[#34088f] ring-4 ring-[#34088f]/10' : 'bg-white border-2 border-gray-200'
+                  }`}>
                   <div className={`w-2 h-2 rounded-full ${idx === 0 ? 'bg-white' : 'bg-gray-400'}`} />
                 </div>
 

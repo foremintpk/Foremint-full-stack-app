@@ -19,7 +19,7 @@ export async function markOrderViewed(
 
     // 1. Double check session role via RPC to prevent unauthorized views logs
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       console.warn('[markOrderViewed]: Unauthorized attempt');
       return;
     }

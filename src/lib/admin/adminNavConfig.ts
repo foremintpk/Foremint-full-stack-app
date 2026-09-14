@@ -23,9 +23,20 @@ export const NAV_ITEMS: NavItem[] = [
     badgeKey: 'llcRegistrations',
   },
   {
-    label: 'PayPal Accounts',
-    href: '/admin/paypal-accounts',
-    icon: 'CreditCard',
+    // SS-4 generation writes filed federal forms, so it stays administrator-only,
+    // matching /admin/settings.
+    label: 'EIN',
+    href: '/admin/ein',
+    icon: 'Stamp',
+    roles: ['administrator'],
+  },
+  {
+    // Bulk document intake + per-order coverage. Administrator-only, matching
+    // EIN, because it writes into client document records.
+    label: 'Documents',
+    href: '/admin/documents',
+    icon: 'FolderOpen',
+    roles: ['administrator'],
   },
   {
     label: 'Addons',
@@ -43,9 +54,10 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'TicketPercent',
   },
   {
-    label: 'Invoices',
-    href: '/admin/invoices',
-    icon: 'FileText',
+    // The client-facing USD invoice PDF generator.
+    label: 'Invoice Generator',
+    href: '/admin/invoice-generator',
+    icon: 'ReceiptText',
   },
   {
     label: 'Expenses',

@@ -19,6 +19,7 @@ const STATUS_OPTIONS: { value: OrderStatus; label: string; colorClass: string }[
   { value: 'submitted_in_state', label: 'Submitted In State', colorClass: 'bg-violet-100 text-violet-800 border-violet-200' },
   { value: 'ein_pending',        label: 'EIN Pending',        colorClass: 'bg-orange-100 text-orange-800 border-orange-200' },
   { value: 'formed',             label: 'Formed',             colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { value: 'payment_pending',    label: 'Payment Pending',    colorClass: 'bg-rose-50 text-rose-600 border-rose-200' },
 ];
 
 export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdownProps): React.JSX.Element {

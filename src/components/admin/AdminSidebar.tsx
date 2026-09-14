@@ -15,16 +15,19 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { NAV_ITEMS } from '@/lib/admin/adminNavConfig';
-import { BadgeCounts } from '@/types/admin';
+import { AdminRole, BadgeCounts } from '@/types/admin';
+import { canAccessSection, sectionForPath } from '@/lib/auth/permissions';
 import { getSidebarCollapsed, setSidebarCollapsed } from '@/lib/admin/notificationCache';
 import { SidebarNavItem } from './SidebarNavItem';
 import { cn } from '@/lib/utils';
 
 interface AdminSidebarProps {
     badgeCounts: BadgeCounts;
+    /** Drives per-item visibility; items with no `roles` are shown to every admin. */
+    role: AdminRole;
 }
 
-export function AdminSidebar({ badgeCounts }: AdminSidebarProps) {
+export function AdminSidebar({ badgeCounts, role }: AdminSidebarProps) {
     const [collapsed, setCollapsed] = useState(false);
     const [mounted, setMounted] = useState(false);
 
@@ -95,7 +98,13 @@ export function AdminSidebar({ badgeCounts }: AdminSidebarProps) {
 
             {/* Navigation List */}
             <nav className="flex-1 overflow-y-auto px-2 py-4 space-y-1.5 scrollbar-thin scrollbar-thumb-white/10">
-                {NAV_ITEMS.map((item) => {
+                {NAV_ITEMS.filter((item) => {
+                    // An explicit roles list still wins where one is set; every
+                    // other item is shown only if the role can open its section.
+                    if (item.roles) return item.roles.includes(role);
+                    const section = sectionForPath(item.href);
+                    return section ? canAccessSection(role, section) : true;
+                }).map((item) => {
                     let count = 0;
                     if (item.badgeKey) {
                         count = badgeCounts[item.badgeKey] || 0;

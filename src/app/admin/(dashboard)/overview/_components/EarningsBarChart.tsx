@@ -17,10 +17,10 @@ interface EarningsBarChartProps {
   earnings: EarningsBreakdown;
 }
 
+// PayPal Accounts and Invoice Commissions were removed from the product, so
+// LLC formation revenue is the only earnings source.
 const BARS = [
-  { key: 'llcRevenue',          label: 'LLC Formations',     color: '#10b981' },
-  { key: 'paypalRevenue',       label: 'PayPal Accounts',    color: '#3b82f6' },
-  { key: 'invoiceCommissions',  label: 'Invoice Commissions', color: '#34088f' },
+  { key: 'llcRevenue', label: 'LLC Formations', color: '#10b981' },
 ];
 
 const formatUSD = (v: number) =>

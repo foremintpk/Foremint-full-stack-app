@@ -36,7 +36,7 @@ export async function markAllNotificationsRead(
       .single();
 
     if (profileErr || !profile || profile.is_active !== true ||
-        (profile.role !== 'administrator' && profile.role !== 'manager')) {
+        (profile.role !== 'administrator' && profile.role !== 'manager' && profile.role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized' };
     }
 

@@ -1,4 +1,7 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { LlcOrderRow } from '@/types/admin';
 import LlcOrderRowComponent from './LlcOrderRow';
 import LlcOrderCardComponent from './LlcOrderCard';
@@ -7,7 +10,17 @@ interface LlcOrderTableProps {
   orders: LlcOrderRow[];
 }
 
+/** Rows shown before "See all" is pressed. */
+const PREVIEW_COUNT = 5;
+
 export default function LlcOrderTable({ orders }: LlcOrderTableProps): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+
+  // Collapses within the current page only; the pagination below still governs
+  // how many orders were fetched.
+  const isCollapsed = !expanded && orders.length > PREVIEW_COUNT;
+  const visible = isCollapsed ? orders.slice(0, PREVIEW_COUNT) : orders;
+
   return (
     <div className="w-full space-y-1.5">
       {/* Desktop & Tablet Table (>=768px) */}
@@ -26,7 +39,7 @@ export default function LlcOrderTable({ orders }: LlcOrderTableProps): React.JSX
         {/* Data rows */}
         <div role="table" aria-label="LLC registrations list" className="w-full space-y-1.5">
           <div role="rowgroup" className="space-y-1.5">
-            {orders.map((order) => (
+            {visible.map((order) => (
               <LlcOrderRowComponent key={order.id} order={order} />
             ))}
           </div>
@@ -35,10 +48,29 @@ export default function LlcOrderTable({ orders }: LlcOrderTableProps): React.JSX
 
       {/* Mobile Stacked Card View (<768px) */}
       <div className="flex flex-col gap-3 md:hidden">
-        {orders.map((order) => (
+        {visible.map((order) => (
           <LlcOrderCardComponent key={order.id} order={order} />
         ))}
       </div>
+
+      {orders.length > PREVIEW_COUNT && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center justify-center gap-1.5 w-full py-2.5 text-xs font-semibold text-[#34088f] bg-white border border-gray-200 rounded-[0.125rem] hover:bg-[#f5f2fe] transition font-inter"
+        >
+          {expanded ? (
+            <>
+              <ChevronUp className="w-3.5 h-3.5" />
+              Show less
+            </>
+          ) : (
+            <>
+              <ChevronDown className="w-3.5 h-3.5" />
+              See all {orders.length} on this page
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }

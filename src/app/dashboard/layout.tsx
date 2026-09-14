@@ -5,7 +5,12 @@ import { getCachedDashboardData, getCachedB2BDashboardData } from '@/lib/dashboa
 import { getCustomerBadgeCounts } from '@/lib/dashboard/getCustomerBadgeCounts';
 import { DashboardShell } from '@/components/dashboard/DashboardShell';
 
-export const revalidate = 60; // Hold layout renders in Full Route Cache for max 60s
+// Rendered per request. This layout awaits getCustomerBadgeCounts() precisely
+// so the shell opens with accurate counts, but a route-level `revalidate`
+// caches the rendered layout above that call, so the "uncached" fetch was
+// served from a snapshot up to 60s old. The data beneath keeps its own tagged
+// caches, which the mutating actions invalidate.
+export const dynamic = 'force-dynamic';
 
 export default async function CustomerDashboardLayout({
   children,

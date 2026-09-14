@@ -10,18 +10,22 @@
 
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { AdminProfile, BadgeCounts, SafeAdminNotification } from '@/types/admin';
+import { AdminProfile, AdminRole, BadgeCounts, SafeAdminNotification } from '@/types/admin';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminScrollLock } from './AdminScrollLock';
 import { LlcNameProvider } from '@/context/llc-name-context';
+import { BatchJobProvider } from '@/context/batch-job-context';
+import { BatchJobBanner } from './BatchJobBanner';
 import { AdminBadgeContext } from '@/context/admin-badge-context';
-import { RealtimeProvider, useRealtime } from '@/components/realtime/RealtimeProvider';
-import { getAdminBadgeCounts } from '@/lib/admin/actions/getAdminBadgeCounts';
+import { RealtimeProvider } from '@/components/realtime/RealtimeProvider';
+import {
+  AdminRealtimeManager,
+  useAdminRealtime,
+} from '@/components/realtime/AdminRealtimeManager';
 import { useRefreshOrchestrator } from '@/lib/hooks/useRefreshOrchestrator';
-import { toast } from 'sonner';
 
 interface AdminShellProps {
   adminProfile: AdminProfile;
@@ -32,115 +36,52 @@ interface AdminShellProps {
 }
 
 // ── Inner shell that consumes RealtimeProvider ─────────────────────────────
+// `badgeCounts` is seeded into AdminRealtimeManager by the outer export, so the
+// inner shell reads live counts from context rather than taking them as a prop.
 function AdminShellInner({
   adminProfile,
-  badgeCounts,
   initialNotifications,
   initialLlcNames,
   children,
-}: AdminShellProps) {
-  const [liveBadges, setLiveBadges] = useState<BadgeCounts>(badgeCounts);
+}: Omit<AdminShellProps, 'badgeCounts'>) {
+  // AdminProfile.role is the wider UserRole even though only admin roles reach
+  // this shell. Narrow it here rather than casting, so an unexpected role gets
+  // the least-privileged nav rather than an administrator's.
+  // AdminProfile.role is the wider UserRole even though only staff roles reach
+  // this shell. Narrow it here rather than casting, so an unexpected role gets
+  // the least-privileged nav rather than an administrator's.
+  const navRole: AdminRole =
+    adminProfile.role === 'administrator'
+      ? 'administrator'
+      : adminProfile.role === 'account_manager'
+        ? 'account_manager'
+        : 'manager';
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  useRefreshOrchestrator(); // 60 s full-page reconciliation
-  const supabase = useRealtime();
-  const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Visibility-aware 120 s reconciliation for Server-Component-rendered content
+  // (LLC grid, stats cards, order tables) that Realtime badge updates do not
+  // cover. Paused entirely while the tab is hidden.
+  useRefreshOrchestrator();
 
-  const handleNotificationBadgeChange = useCallback((unreadNotifCount: number) => {
-    setLiveBadges((prev) => {
-      if (prev.notifications === unreadNotifCount) return prev;
-      return { ...prev, notifications: unreadNotifCount };
-    });
-  }, []);
+  const {
+    badges: liveBadges,
+    setBadges,
+    decrementLlcOrderBadge,
+  } = useAdminRealtime();
 
-  const decrementLlcOrderBadge = useCallback(() => {
-    setLiveBadges((prev) => ({
-      ...prev,
-      llcRegistrations: Math.max(0, prev.llcRegistrations - 1),
-    }));
-  }, []);
+  const handleNotificationBadgeChange = useCallback(
+    (unreadNotifCount: number) => {
+      setBadges((prev) => {
+        if (prev.notifications === unreadNotifCount) return prev;
+        return { ...prev, notifications: unreadNotifCount };
+      });
+    },
+    [setBadges]
+  );
 
-  // ── Realtime sidebar badges ──────────────────────────────────────────────
-  // Admins can SELECT all rows so postgres_changes delivers reliably.
-  // Any insert/update on watched tables triggers a debounced count refetch.
-  useEffect(() => {
-    const scheduleRefetch = () => {
-      if (refetchTimer.current) clearTimeout(refetchTimer.current);
-      refetchTimer.current = setTimeout(async () => {
-        const fresh = await getAdminBadgeCounts();
-        setLiveBadges(fresh);
-      }, 400);
-    };
-
-    const channel = supabase
-      .channel('admin-badges')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queries' }, scheduleRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'query_messages' }, scheduleRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, scheduleRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'billing_entries' }, scheduleRefetch)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_order_views' }, scheduleRefetch)
-      .subscribe();
-
-    return () => {
-      if (refetchTimer.current) clearTimeout(refetchTimer.current);
-      supabase.removeChannel(channel);
-    };
-  }, [supabase]);
-
-  // ── New-ticket toast notification ─────────────────────────────────────────
-  // Listen for INSERT on queries so the admin sees a toast the moment a
-  // customer opens a new ticket — before the badge count re-renders.
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin-new-ticket-toast')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'queries' },
-        (payload) => {
-          const subject = (payload.new as Record<string, unknown>)?.subject as string | undefined;
-          toast.info(`New support ticket${subject ? `: "${subject}"` : ''}`, {
-            description: 'A customer just opened a ticket.',
-            action: { label: 'View', onClick: () => { window.location.href = '/admin/queries'; } },
-          });
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase]);
-
-  // ── New-message toast (customer replied) ──────────────────────────────────
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin-new-message-toast')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'query_messages' },
-        (payload) => {
-          const senderId = (payload.new as Record<string, unknown>)?.sender_id as string | undefined;
-          // Only toast for messages NOT from this admin
-          if (senderId && senderId !== adminProfile.id) {
-            toast.info('New support reply', {
-              description: 'A customer replied to a support ticket.',
-              action: { label: 'View', onClick: () => { window.location.href = '/admin/queries'; } },
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, adminProfile.id]);
-
-  // ── 30-second fallback badge poll ─────────────────────────────────────────
-  // Catches any events the WS channel missed (e.g. during reconnect).
-  useEffect(() => {
-    const id = setInterval(async () => {
-      const fresh = await getAdminBadgeCounts();
-      setLiveBadges(fresh);
-    }, 30_000);
-    return () => clearInterval(id);
-  }, []);
+  // Realtime subscriptions, badge refetching and the fallback reconciliation
+  // poll all live in <AdminRealtimeManager>, which owns a single channel for
+  // the whole admin shell. This component consumes that state.
 
   const handleMobileToggle = useCallback(() => {
     setIsMobileMenuOpen((prev) => !prev);
@@ -148,12 +89,15 @@ function AdminShellInner({
 
   return (
     <AdminBadgeContext.Provider value={{ decrementLlcOrderBadge }}>
+      {/* Mounted here, above the routed page, so a batch run survives the
+          operator navigating to another admin screen mid-run. */}
+      <BatchJobProvider>
       <LlcNameProvider initialNames={initialLlcNames}>
         <AdminScrollLock />
         <div className="flex h-screen w-full overflow-hidden bg-gray-50 font-inter">
           {/* Desktop Sidebar */}
           <div className="hidden lg:relative lg:flex lg:flex-shrink-0 lg:overflow-visible">
-            <AdminSidebar badgeCounts={liveBadges} />
+            <AdminSidebar badgeCounts={liveBadges} role={navRole} />
           </div>
 
           {/* Mobile Navigation Drawer Overlay */}
@@ -173,7 +117,7 @@ function AdminShellInner({
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                  <AdminSidebar badgeCounts={liveBadges} />
+                  <AdminSidebar badgeCounts={liveBadges} role={navRole} />
                 </div>
               </div>
               <div className="absolute inset-0 left-64 h-full w-full" onClick={handleMobileToggle} />
@@ -195,15 +139,25 @@ function AdminShellInner({
           </div>
         </div>
       </LlcNameProvider>
+      <BatchJobBanner />
+      </BatchJobProvider>
     </AdminBadgeContext.Provider>
   );
 }
 
 // ── Public export wraps the inner shell with the shared realtime client ───
+// AdminRealtimeManager sits inside RealtimeProvider (it needs the client) and
+// outside the shell, so every admin surface reads one set of live counts from
+// one channel.
 export function AdminShell(props: AdminShellProps) {
   return (
     <RealtimeProvider>
-      <AdminShellInner {...props} />
+      <AdminRealtimeManager
+        adminId={props.adminProfile.id}
+        initialBadges={props.badgeCounts}
+      >
+        <AdminShellInner {...props} />
+      </AdminRealtimeManager>
     </RealtimeProvider>
   );
 }

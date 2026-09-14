@@ -67,6 +67,7 @@ async function fetchCouponsQuery(
     totalUses: Number(row.total_uses || 0),
     usedCount: Number(row.used_count || 0),
     perUserUses: Number(row.per_user_uses || 0),
+    allowedStates: Array.isArray(row.allowed_states) ? row.allowed_states : [],
     status: row.status as CouponStatus,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

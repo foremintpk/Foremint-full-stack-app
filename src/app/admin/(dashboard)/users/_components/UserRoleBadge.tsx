@@ -14,6 +14,7 @@ export function UserRoleBadge({ role }: UserRoleBadgeProps): React.JSX.Element {
   const styles = {
     administrator: 'bg-[#f4f0fe] text-[#34088f] border-[#e0d9f7]',
     manager: 'bg-blue-50 text-blue-700 border-blue-200',
+    account_manager: 'bg-teal-50 text-teal-700 border-teal-200',
     customer: 'bg-gray-50 text-gray-600 border-gray-200',
     b2b_customer: 'bg-amber-50 text-amber-700 border-amber-200',
   };
@@ -21,6 +22,7 @@ export function UserRoleBadge({ role }: UserRoleBadgeProps): React.JSX.Element {
   const labels: Record<UserRole, string> = {
     administrator: 'Administrator',
     manager: 'Manager',
+    account_manager: 'Account Manager',
     customer: 'Customer',
     b2b_customer: 'B2B Customer',
   };

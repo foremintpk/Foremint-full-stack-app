@@ -214,8 +214,22 @@ export interface PublicPackage {
   sortOrder: number
 }
 
+/** How often a state requires a report/franchise filing after formation. */
+export type StateRenewalCycle = 'Annual' | 'Biennial' | 'None'
+
 export interface StateFeeConfig {
   stateCode: string
   stateName: string
+  /** One-time state filing fee, USD. */
   fee: number
+  /** Recurring report/franchise fee, USD. 0 where the state charges nothing. */
+  renewalFee: number
+  renewalCycle: StateRenewalCycle
+  /**
+   * Renewal due date as published by the state, e.g. "Apr 15" or
+   * "Anniversary month". Anniversary-based states cannot be reduced to a fixed
+   * calendar date, which is why this stays human-readable and
+   * resolveRenewalDate() turns it into a real date per company.
+   */
+  renewalDue: string
 }

@@ -59,6 +59,7 @@ export function PaymentStep({ formData, onChange }: PaymentStepProps) {
         body: JSON.stringify({
           code,
           subtotal,
+          formationState: formData.formationState,
         }),
       })
 

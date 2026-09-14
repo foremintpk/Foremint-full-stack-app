@@ -73,7 +73,7 @@ export async function createClientNotification(
   try {
     const supabase = await createClient();
     const { data: role, error: roleError } = await supabase.rpc('get_my_role');
-    if (roleError || (role !== 'administrator' && role !== 'manager')) {
+    if (roleError || (role !== 'administrator' && role !== 'manager' && role !== 'account_manager')) {
       return { success: false, error: 'Unauthorized' };
     }
 
@@ -114,7 +114,9 @@ export async function createClientNotification(
 
     // Encode the admin-chosen category into `type` so the customer dashboard's
     // category inference (billing/documents/general/addons) maps correctly.
-    await admin.from('notifications').insert({
+    // Unlike the system → admin notifications, this one is sent deliberately by
+    // an admin and the UI reports the outcome, so a failure must not be silent.
+    const { error: notifError } = await admin.from('notifications').insert({
       type: `order_${input.category}`,
       recipient_id: recipientId,
       target_role: 'customer',
@@ -123,6 +125,16 @@ export async function createClientNotification(
       link: `/dashboard/llc/${input.orderId}`,
       is_read: false,
     } as any);
+
+    if (notifError) {
+      console.error('[manageClientNotifications] insert failed', {
+        orderId: input.orderId,
+        recipientId,
+        code: notifError.code,
+        message: notifError.message,
+      });
+      return { success: false, error: 'Failed to send the notification.' };
+    }
 
     // Invalidate the recipient's notification + dashboard caches so it shows immediately
     if (recipientId) {
@@ -174,7 +186,7 @@ export async function deleteClientNotification(
   try {
     const supabase = await createClient();
     const { data: role } = await supabase.rpc('get_my_role');
-    if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
+    if (role !== 'administrator' && role !== 'manager' && role !== 'account_manager') return { success: false, error: 'Unauthorized' };
 
     const admin = createAdminClient();
 
@@ -256,7 +268,7 @@ export async function toggleClientNotificationStatus(
   try {
     const supabase = await createClient();
     const { data: role } = await supabase.rpc('get_my_role');
-    if (role !== 'administrator' && role !== 'manager') return { success: false, error: 'Unauthorized' };
+    if (role !== 'administrator' && role !== 'manager' && role !== 'account_manager') return { success: false, error: 'Unauthorized' };
 
     const admin = createAdminClient();
 

@@ -640,6 +640,7 @@ export type Database = {
       }
       coupons: {
         Row: {
+          allowed_states: string[]
           code: string
           created_at: string
           discount_type: string
@@ -653,6 +654,7 @@ export type Database = {
           used_count: number
         }
         Insert: {
+          allowed_states?: string[]
           code: string
           created_at?: string
           discount_type: string
@@ -666,6 +668,7 @@ export type Database = {
           used_count?: number
         }
         Update: {
+          allowed_states?: string[]
           code?: string
           created_at?: string
           discount_type?: string
@@ -1918,10 +1921,16 @@ export type Database = {
         | "submitted_in_state"
         | "ein_pending"
         | "formed"
+        | "payment_pending"
         | "cancelled"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
-      user_role: "administrator" | "manager" | "customer" | "b2b_customer"
+      user_role:
+        | "administrator"
+        | "manager"
+        | "account_manager"
+        | "customer"
+        | "b2b_customer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2088,11 +2097,18 @@ export const Constants = {
         "submitted_in_state",
         "ein_pending",
         "formed",
+        "payment_pending",
         "cancelled",
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],
       storage_provider: ["supabase", "cloudinary"],
-      user_role: ["administrator", "manager", "customer", "b2b_customer"],
+      user_role: [
+        "administrator",
+        "manager",
+        "account_manager",
+        "customer",
+        "b2b_customer",
+      ],
     },
   },
 } as const
