@@ -85,6 +85,28 @@ export async function getPaymentPendingRecipients(): Promise<{
     const rows = (data ?? []) as Record<string, unknown>[];
     if (rows.length === 0) return { success: true, recipients: [] };
 
+    // Compute the balance from billing_entries rather than trusting the stored
+    // orders.pending_amount_usd. That column is a denormalised cache kept in
+    // step by syncOrderPaymentStatus, and when a sync is missed it quotes an
+    // amount the customer does not owe. An email is not recallable, so this
+    // path derives the figure the same way the admin Billing tab does.
+    const orderIds = rows.map((r) => r.id as string);
+    const { data: entryRows } = await admin
+      .from('billing_entries')
+      .select('order_id, amount, type')
+      .in('order_id', orderIds);
+
+    const totalsByOrder = new Map<string, { charges: number; discounts: number; payments: number }>();
+    for (const e of (entryRows ?? []) as Record<string, unknown>[]) {
+      const key = e.order_id as string;
+      const t = totalsByOrder.get(key) ?? { charges: 0, discounts: 0, payments: 0 };
+      const amount = Number(e.amount) || 0;
+      if (e.type === 'charge') t.charges += amount;
+      else if (e.type === 'discount') t.discounts += amount;
+      else if (e.type === 'payment') t.payments += amount;
+      totalsByOrder.set(key, t);
+    }
+
     // One query for the whole set rather than per order, so the dialog can show
     // "last reminded" without N round trips.
     const { data: logRows } = await admin
@@ -116,16 +138,27 @@ export async function getPaymentPendingRecipients(): Promise<{
           clientName: (p.full_name as string) ?? '',
           clientEmail: (p.email as string) ?? '',
           businessName: typeof snapshot.businessName === 'string' ? snapshot.businessName : '',
-          pendingAmount:
-            row.payment_status === 'paid'
-              ? 0
-              : Number(row.pending_amount_usd ?? row.grand_total ?? 0),
+          pendingAmount: (() => {
+            const t = totalsByOrder.get(row.id as string);
+            if (!t) {
+              // No billing entries at all: nothing has been recorded against
+              // the order, so the whole grand total is outstanding.
+              return Number(row.grand_total ?? 0);
+            }
+            const effective = Number(row.grand_total ?? 0) + t.charges - t.discounts;
+            return Math.max(0, effective - t.payments);
+          })(),
           lastRemindedAt: lastSent.get(row.id as string) ?? null,
         };
       })
       // An order with no email on file cannot be reminded; drop it here so the
       // count in the dialog matches what will actually be sent.
-      .filter((r) => r.clientEmail.length > 0);
+      .filter((r) => r.clientEmail.length > 0)
+      // An order sitting in payment_pending whose entries show nothing due has
+      // been paid without the status being moved on. Chasing that customer for
+      // money they already sent is the worst outcome of this whole flow, so it
+      // is excluded regardless of what the stored column claims.
+      .filter((r) => r.pendingAmount > 0);
 
     return { success: true, recipients };
   } catch (err) {
