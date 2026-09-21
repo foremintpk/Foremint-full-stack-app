@@ -15,6 +15,7 @@
 import 'server-only';
 import OpenAI from 'openai';
 import { getSs4Settings } from './settings';
+import { buildModelChain, isModelUnavailable } from './visionModels';
 
 export interface VisionImage {
   /** Base64 payload, no data: prefix. */
@@ -104,6 +105,9 @@ export function explainVisionError(error: unknown): string {
   if (/timeout|ETIMEDOUT/i.test(message)) {
     return 'The vision provider timed out reading this document. Try this order again on its own.';
   }
+  if (isModelUnavailable(error)) {
+    return 'Every available model is temporarily unavailable at the provider. This usually clears within a few minutes — run again shortly.';
+  }
   return message;
 }
 
@@ -113,10 +117,14 @@ async function askFazita(
   system: string,
   prompt: string,
   images: VisionImage[],
-  maxTokens: number
+  maxTokens: number,
+  /** Overrides the configured model, used when walking the fallback chain. */
+  modelOverride?: string
 ): Promise<{ text: string; model: string }> {
-  const { apiKey, model } = await getCredentials();
+  const { apiKey, model: configuredModel } = await getCredentials();
   if (!apiKey) throw new VisionNotConfiguredError();
+
+  const model = modelOverride ?? configuredModel;
 
   const client = new OpenAI({
     baseURL: API_BASE_URL,
@@ -147,6 +155,20 @@ async function askFazita(
   return { text: completion.choices[0]?.message?.content || '', model };
 }
 
+/**
+ * Ask the vision gateway, falling back across models when one is unavailable.
+ *
+ * Two different failures are handled differently, because the right response to
+ * each is different:
+ *
+ *   • The model is down (503). Retrying it is pointless for as long as the
+ *     outage lasts, so we move to the next model in the chain immediately.
+ *   • The request failed transiently (429, 500, socket reset). The model is
+ *     fine, so we retry it with backoff before giving up on it.
+ *
+ * Anything else — a bad key, a quota problem — is not retried at all, since no
+ * amount of waiting or model-switching will change the answer.
+ */
 export async function askVision(options: {
   system: string;
   prompt: string;
@@ -155,25 +177,54 @@ export async function askVision(options: {
   attempts?: number;
 }): Promise<{ text: string; provider: string }> {
   const maxTokens = options.maxTokens ?? 512;
-  const attempts = options.attempts ?? 3;
+  const attemptsPerModel = options.attempts ?? 3;
+
+  const { model: configuredModel } = await getCredentials();
+  const chain = buildModelChain(configuredModel);
+
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      const { text, model } = await askFazita(
-        options.system,
-        options.prompt,
-        options.images,
-        maxTokens
-      );
-      return { text, provider: `fazita/${model}` };
-    } catch (error) {
-      lastError = error;
-      if (attempt === attempts || !isTransient(error)) break;
-      await sleep(attempt * 2000 - 1000);
+  for (const model of chain) {
+    for (let attempt = 1; attempt <= attemptsPerModel; attempt++) {
+      try {
+        const { text } = await askFazita(
+          options.system,
+          options.prompt,
+          options.images,
+          maxTokens,
+          model
+        );
+        if (model !== configuredModel) {
+          console.warn(
+            `[vision] ${configuredModel} unavailable; read completed on ${model}`
+          );
+        }
+        return { text, provider: `fazita/${model}` };
+      } catch (error) {
+        lastError = error;
+
+        // This model is down. Further attempts against it cannot succeed, so
+        // stop spending the retry budget here and try the next one.
+        if (isModelUnavailable(error)) {
+          console.warn(`[vision] model ${model} unavailable, trying next`, {
+            message: error instanceof Error ? error.message : String(error),
+          });
+          break;
+        }
+
+        // Permanent failure (auth, quota): switching models will not help.
+        if (!isTransient(error)) return Promise.reject(error);
+
+        if (attempt === attemptsPerModel) break;
+        await sleep(attempt * 2000 - 1000);
+      }
     }
   }
 
+  console.error('[vision] every model in the chain failed', {
+    chain,
+    message: lastError instanceof Error ? lastError.message : String(lastError),
+  });
   throw lastError;
 }
 
