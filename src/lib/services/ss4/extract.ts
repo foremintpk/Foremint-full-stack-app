@@ -183,7 +183,7 @@ async function parseWithVision(pdf: Uint8Array, extra: string): Promise<Extracti
   if (!(await visionStatus()).configured) {
     throw new Error(
       "This Articles PDF has no text layer and no vision provider is configured. " +
-        "Add the Fazita API key under Admin → EIN → Settings, or supply this order's address in the instructions box."
+        "Add the Anthropic API key under Admin → EIN → Settings, or supply this order's address in the instructions box."
     );
   }
 

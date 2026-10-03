@@ -98,7 +98,7 @@ export async function verifyName(
       idName: null,
       source: "order-form",
       status: "unverified",
-      note: "No vision provider is configured, so the identity document could not be read. Add the Fazita API key under Admin → EIN → Settings.",
+      note: "No vision provider is configured, so the identity document could not be read. Add the Anthropic API key under Admin → EIN → Settings.",
     };
   }
 

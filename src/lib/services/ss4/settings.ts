@@ -2,7 +2,7 @@
  * @file src/lib/services/ss4/settings.ts
  * @description Reads and writes the single-row SS-4 automation config.
  *
- * 1. Server vs Client choice rationale: Server-only. The row holds the Fazita
+ * 1. Server vs Client choice rationale: Server-only. The row holds the vision
  *    API key, so it must never be fetched from a client component.
  * 2. Caching layer: None. The schedule and key are read by the cron and the
  *    generation service, where a stale value would either skip a scheduled run
@@ -14,6 +14,7 @@
 
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { configuredVisionModel, DEFAULT_VISION_MODEL, isAnthropicApiKey } from './visionModels';
 
 export interface Ss4Settings {
   automationEnabled: boolean;
@@ -66,7 +67,7 @@ const DEFAULTS: Ss4Settings = {
   lastRunAt: null,
   lastRunBatchId: null,
   visionApiKey: null,
-  visionModel: 'claude-opus-5',
+  visionModel: DEFAULT_VISION_MODEL,
   activeTemplateId: null,
   updatedAt: null,
 };
@@ -95,7 +96,9 @@ function fromRow(row: SettingsRow): Ss4Settings {
     lastRunAt: row.last_run_at,
     lastRunBatchId: row.last_run_batch_id,
     visionApiKey: row.vision_api_key,
-    visionModel: row.vision_model,
+    // The vision_model column is not read: it still holds the model name from
+    // the previous provider, and the model is a code/env decision now.
+    visionModel: configuredVisionModel(),
     activeTemplateId: row.active_template_id,
     updatedAt: row.updated_at,
   };
@@ -121,10 +124,13 @@ export async function getSs4Settings(): Promise<Ss4Settings> {
 /** Strips the API key so the result is safe to pass into a client component. */
 export function toPublicSettings(settings: Ss4Settings): Ss4SettingsPublic {
   const { visionApiKey, ...rest } = settings;
+  // A key stored for the previous provider is not usable, so it is reported as
+  // absent — otherwise the UI would say "Installed" while every read failed.
+  const usable = isAnthropicApiKey(visionApiKey);
   return {
     ...rest,
-    hasVisionKey: Boolean(visionApiKey),
-    visionKeyHint: visionApiKey ? `…${visionApiKey.slice(-4)}` : null,
+    hasVisionKey: usable,
+    visionKeyHint: usable ? `…${visionApiKey!.slice(-4)}` : null,
   };
 }
 
@@ -134,7 +140,6 @@ export interface Ss4SettingsUpdate {
   scheduleTimes?: Record<string | number, string>;
   /** Omit to leave the stored key untouched; '' clears it. */
   visionApiKey?: string;
-  visionModel?: string;
   activeTemplateId?: string | null;
 }
 
@@ -145,7 +150,6 @@ export async function updateSs4Settings(
   const row: Record<string, unknown> = { updated_by: adminId };
 
   if (patch.automationEnabled !== undefined) row.automation_enabled = patch.automationEnabled;
-  if (patch.visionModel !== undefined) row.vision_model = patch.visionModel;
   if (patch.activeTemplateId !== undefined) row.active_template_id = patch.activeTemplateId;
 
   if (patch.scheduleTimes !== undefined) {

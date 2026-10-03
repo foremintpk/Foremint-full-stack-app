@@ -234,7 +234,7 @@ export default function AutomationBar({
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               disabled={disabled || saving}
-              placeholder={settings.hasVisionKey ? 'Enter a new key to replace the current one' : 'Paste the Fazita API key'}
+              placeholder={settings.hasVisionKey ? 'Enter a new key to replace the current one' : 'Paste the Anthropic API key'}
               className="w-full px-2.5 py-1.5 pr-9 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#34088f]/20 focus:border-[#34088f]"
             />
             <button

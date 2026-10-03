@@ -2,7 +2,7 @@
  * @file src/app/api/admin/ss4/settings/route.ts
  * @description Reads and updates the SS-4 automation config.
  *
- * The stored Fazita key is never returned — GET sends `hasVisionKey` and a
+ * The stored vision key is never returned — GET sends `hasVisionKey` and a
  * four-character hint so an administrator can tell which key is installed
  * without the secret crossing the wire.
  */
