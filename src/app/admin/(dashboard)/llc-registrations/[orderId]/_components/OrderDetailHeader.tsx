@@ -10,6 +10,7 @@ import { formatDate } from '@/lib/admin/formatters';
 import { StatusDropdown } from './StatusDropdown';
 import LlcNewBadge from '../../_components/LlcNewBadge';
 import type { OrderDetail } from '@/types/admin';
+import { hasItinAddon, type OrderStatusKey } from '@/lib/orders/orderStatus';
 
 interface OrderDetailHeaderProps {
  order: OrderDetail;
@@ -76,8 +77,13 @@ export function OrderDetailHeader({
  </span>
  <StatusDropdown
  orderId={order.id}
- currentStatus={order.status}
+ currentStatus={order.status as OrderStatusKey}
  adminId={adminId}
+ hasItinAddon={hasItinAddon({
+ selectedAddons: order.selectedAddons,
+ addonsSnapshot: order.addonsSnapshot,
+ internalAddons: order.internalAddons,
+ })}
  />
  </div>
  </div>

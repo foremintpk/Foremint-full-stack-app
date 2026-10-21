@@ -4,26 +4,19 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Building2, Search, Plus, CalendarDays, MapPin, ArrowRight } from 'lucide-react';
 import type { CustomerLlcItem } from '@/types/dashboard';
+import { getStatusDisplay } from '@/lib/orders/orderStatus';
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    pending:            { label: 'Pending',            cls: 'bg-amber-100 text-amber-700' },
-    initialized:        { label: 'Initialized',        cls: 'bg-blue-100 text-blue-700' },
-    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-700' },
-    ein_pending:        { label: 'EIN Pending',        cls: 'bg-orange-100 text-orange-700' },
-    formed:             { label: 'Formed',             cls: 'bg-emerald-100 text-emerald-700' },
-    payment_pending:    { label: 'Payment Pending',    cls: 'bg-rose-50 text-rose-600' },
-    cancelled:          { label: 'Cancelled',          cls: 'bg-gray-100 text-gray-500' },
-  };
-  // Fall back to a humanised label rather than the raw enum key, so an
-  // unmapped status never renders as "PAYMENT_PENDING" with its underscores.
-  const config = map[status] ?? {
-    label: status.replace(/_/g, ' '),
-    cls: 'bg-gray-100 text-gray-600',
-  };
+  // Labels and colours come from the shared order-status registry, so the
+  // customer sees exactly what the admin set. Unmapped values fall back to a
+  // humanised label rather than the raw enum key.
+  const { label, style } = getStatusDisplay(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope ${config.cls}`}>
-      {config.label}
+    <span
+      className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope bg-gray-100 text-gray-600"
+      style={style ? { backgroundColor: style.bg, color: style.text } : undefined}
+    >
+      {label}
     </span>
   );
 }

@@ -57,6 +57,20 @@ export function formatLlcName(rawName: string | null | undefined): string {
 }
 
 /**
+ * Business name out of an order's form snapshot, or '' when none was entered.
+ * Newer snapshots nest it under step3; older ones keep it at the root. Used by
+ * the customer emails, which should name the LLC rather than say "your company".
+ */
+export function readSnapshotBusinessName(snapshot: unknown): string {
+  if (!snapshot || typeof snapshot !== 'object') return '';
+  const root = snapshot as Record<string, unknown>;
+  const step3 =
+    root.step3 && typeof root.step3 === 'object' ? (root.step3 as Record<string, unknown>) : {};
+  const raw = step3.businessName ?? root.businessName;
+  return typeof raw === 'string' && raw.trim() ? formatLlcName(raw) : '';
+}
+
+/**
  * Formats an ISO string to short date.
  * E.g., "May 12, 2026"
  */

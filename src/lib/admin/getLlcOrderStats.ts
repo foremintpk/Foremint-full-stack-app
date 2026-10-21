@@ -1,6 +1,6 @@
 /**
  * @file src/lib/admin/getLlcOrderStats.ts
- * @description Fetches the top 4 status statistics for LLC orders.
+ * @description Fetches the per-status counts for LLC orders.
  * Supports caching using Next.js unstable_cache and request-level React cache().
  *
  * FIX (Next.js 15+): cookies() must NOT be called inside unstable_cache().
@@ -15,6 +15,7 @@ import { LlcTopStats, DateRangeFilter } from '@/types/admin';
 import { DATE_RANGES } from './dateRanges';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { countByStatus } from '@/lib/orders/orderStatus';
 
 async function fetchLlcOrderStats(
   supabase: SupabaseClient<Database>,
@@ -40,25 +41,8 @@ async function fetchLlcOrderStats(
   }
 
   const orders = data || [];
-  const total = orders.length;
-  let pending = 0;
-  let initialized = 0;
-  let submittedInState = 0;
-  let einPending = 0;
-  let formed = 0;
-  let paymentPending = 0;
 
-  orders.forEach((o) => {
-    const s = o.status;
-    if (s === 'pending') pending++;
-    else if (s === 'initialized') initialized++;
-    else if (s === 'submitted_in_state') submittedInState++;
-    else if (s === 'ein_pending') einPending++;
-    else if (s === 'formed') formed++;
-    else if (s === 'payment_pending') paymentPending++;
-  });
-
-  return { total, pending, initialized, submittedInState, einPending, formed, paymentPending };
+  return { total: orders.length, byStatus: countByStatus(orders) };
 }
 
 export async function getCachedLlcOrderStats(

@@ -2,8 +2,8 @@
 
 /**
  * @file src/app/admin/(dashboard)/llc-registrations/_components/SendPaymentRemindersButton.tsx
- * @description Bulk payment-reminder trigger, shown only while the Payment
- * Pending filter is active.
+ * @description Bulk payment-reminder trigger, shown only while the Pending
+ * Payment or ITIN Payment Pending filter is active.
  *
  * The send is paced 10–50 s between recipients so a batch does not arrive as an
  * obvious blast, which keeps it clear of spam heuristics. That pacing means a
@@ -23,6 +23,7 @@ import {
   sendSinglePaymentReminder,
   type ReminderRecipient,
 } from '@/lib/admin/actions/sendPaymentReminders';
+import type { OrderStatusValue } from '@/lib/orders/orderStatus';
 
 /** Inclusive bounds for the pause between two sends. */
 const MIN_DELAY_MS = 10_000;
@@ -42,9 +43,11 @@ interface Progress {
 
 interface SendPaymentRemindersButtonProps {
   adminId: string;
+  /** The payment-pending status being viewed; only its orders are reminded. */
+  status: OrderStatusValue;
 }
 
-export function SendPaymentRemindersButton({ adminId }: SendPaymentRemindersButtonProps) {
+export function SendPaymentRemindersButton({ adminId, status }: SendPaymentRemindersButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [recipients, setRecipients] = useState<ReminderRecipient[]>([]);
@@ -66,7 +69,7 @@ export function SendPaymentRemindersButton({ adminId }: SendPaymentRemindersButt
   const openDialog = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await getPaymentPendingRecipients();
+      const res = await getPaymentPendingRecipients(status);
       if (!res.success) {
         toast.error(res.error ?? 'Could not load recipients');
         return;
@@ -80,7 +83,7 @@ export function SendPaymentRemindersButton({ adminId }: SendPaymentRemindersButt
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [status]);
 
   /** Interruptible sleep — resolves early when the run is cancelled. */
   const waitWithCountdown = useCallback((ms: number): Promise<void> => {

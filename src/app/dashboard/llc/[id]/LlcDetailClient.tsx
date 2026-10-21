@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { OrderDetail, OrderDocument } from '@/types/admin';
 import { submitDocumentProof, submitBankTransferReceipt } from '@/lib/dashboard/actions';
+import { getStatusDisplay, isFormationCompleteStatus, isInProgressStatus } from '@/lib/orders/orderStatus';
 import {
   Building2, FileText, CreditCard, Shield, Clock,
   CheckCircle2, AlertCircle, Upload, ExternalLink,
@@ -26,30 +27,14 @@ type TabKey = typeof TABS[number]['key'];
 
 // ── Status helpers ──────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-700' },
-    confirmed: { label: 'Confirmed', cls: 'bg-blue-100 text-blue-700' },
-    processing: { label: 'Processing', cls: 'bg-indigo-100 text-indigo-700' },
-    completed: { label: 'Active', cls: 'bg-emerald-100 text-emerald-700' },
-    awaiting_documents: { label: 'Docs Needed', cls: 'bg-orange-100 text-orange-700' },
-    awaiting_payment: { label: 'Payment Needed', cls: 'bg-rose-100 text-rose-700' },
-    // Order-status values. These were absent, so they rendered as raw keys
-    // ("submitted_in_state") through the fallback below.
-    initialized: { label: 'Initialized', cls: 'bg-blue-100 text-blue-700' },
-    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-700' },
-    ein_pending: { label: 'EIN Pending', cls: 'bg-orange-100 text-orange-700' },
-    formed: { label: 'Formed', cls: 'bg-emerald-100 text-emerald-700' },
-    payment_pending: { label: 'Payment Pending', cls: 'bg-rose-50 text-rose-600' },
-    cancelled: { label: 'Cancelled', cls: 'bg-gray-100 text-gray-500' },
-  };
-  // Humanise unmapped values rather than printing the raw enum key.
-  const cfg = map[status] ?? {
-    label: status.replace(/_/g, ' '),
-    cls: 'bg-gray-100 text-gray-600',
-  };
+  // Shared order-status registry: same label and colour as the admin portal.
+  const { label, style } = getStatusDisplay(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope ${cfg.cls}`}>
-      {cfg.label}
+    <span
+      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-manrope bg-gray-100 text-gray-600"
+      style={style ? { backgroundColor: style.bg, color: style.text } : undefined}
+    >
+      {label}
     </span>
   );
 }
@@ -936,8 +921,8 @@ function ComplianceTab({ llc }: { llc: OrderDetail }) {
     },
     {
       label: 'Formation Processing',
-      status: llc.status === 'formed' ? 'done' : ['initialized', 'submitted_in_state', 'ein_pending'].includes(llc.status) ? 'warning' : 'pending',
-      detail: llc.status === 'formed' ? 'LLC successfully formed' : ['initialized', 'submitted_in_state', 'ein_pending'].includes(llc.status) ? 'Currently being processed' : 'Awaiting processing',
+      status: isFormationCompleteStatus(llc.status) ? 'done' : isInProgressStatus(llc.status) ? 'warning' : 'pending',
+      detail: isFormationCompleteStatus(llc.status) ? 'LLC successfully formed' : isInProgressStatus(llc.status) ? 'Currently being processed' : 'Awaiting processing',
     },
   ];
 

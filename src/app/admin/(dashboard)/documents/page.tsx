@@ -15,6 +15,7 @@ import { redirect } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { getCurrentAdminProfile } from '@/lib/admin/getCurrentAdminProfile';
 import { getCoverage, TRACKED_CATEGORIES } from '@/lib/services/documents/orderBook';
+import { isDocumentsExpectedStatus } from '@/lib/orders/orderStatus';
 import DocumentsWorkspace from './_components/DocumentsWorkspace';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +49,7 @@ export default async function DocumentsPage() {
   // A coverage failure should not blank the page — the upload half still works.
   const coverage = await getCoverage().catch(() => []);
 
-  const active = coverage.filter((r) => r.status === 'formed' || r.status === 'ein_pending');
+  const active = coverage.filter((r) => isDocumentsExpectedStatus(r.status));
   const missing = TRACKED_CATEGORIES.reduce(
     (acc, cat) => {
       acc[cat] = active.filter((r) => !r.has[cat]).length;

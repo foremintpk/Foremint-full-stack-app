@@ -12,6 +12,7 @@ import type { BillingEntry } from '@/lib/admin/actions/addBillingEntry';
 import type { ClientNotification } from '@/lib/admin/actions/manageClientNotifications';
 import type { OrderTicket } from '@/lib/admin/actions/manageTickets';
 import { StatusDropdown } from './StatusDropdown';
+import { getStatusDisplay, hasItinAddon, type OrderStatusKey } from '@/lib/orders/orderStatus';
 
 import { OverviewTab } from './tabs/OverviewTab';
 import { FormationDetailsTab } from './tabs/FormationDetailsTab';
@@ -100,23 +101,23 @@ export function OrderDetailTabsClient({
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, ...updates } : n));
   }, []);
 
-  // Status badge label + colour. Several order statuses were missing here, so
-  // they fell through to the grey default and rendered the raw enum key
-  // ("payment_pending") instead of a readable label.
-  const statusStyles: Record<string, { label: string; cls: string }> = {
-    pending: { label: 'Pending', cls: 'bg-amber-100 text-amber-800' },
-    initialized: { label: 'Initialized', cls: 'bg-blue-100 text-blue-800' },
-    submitted_in_state: { label: 'Submitted In State', cls: 'bg-violet-100 text-violet-800' },
-    ein_pending: { label: 'EIN Pending', cls: 'bg-orange-100 text-orange-800' },
-    processing: { label: 'Processing', cls: 'bg-blue-100 text-blue-800' },
-    formed: { label: 'Formed', cls: 'bg-emerald-100 text-emerald-800' },
-    payment_pending: { label: 'Payment Pending', cls: 'bg-rose-50 text-rose-600' },
-    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-700' },
-  };
-  const statusStyle = statusStyles[order.status] ?? {
-    label: order.status.replace(/_/g, ' '),
-    cls: 'bg-gray-100 text-gray-600',
-  };
+  // Badge label + colour come from the shared status registry, so this header
+  // always agrees with the dropdown, the list badges and the customer portal.
+  const statusDisplay = getStatusDisplay(order.status);
+
+  // ITIN statuses are offered only for orders that bought the ITIN add-on.
+  // Checkout add-ons are stored as ids, so their names are resolved through the
+  // add-on catalogue; admin-assigned internal add-ons carry their own name.
+  const orderHasItin = hasItinAddon({
+    selectedAddons: order.selectedAddons,
+    addonsSnapshot: [
+      ...order.addonsSnapshot,
+      ...allAddons.filter((a) => order.selectedAddons.includes(a.id)),
+    ],
+    internalAddons: (internalData?.internalAddons ?? []).filter(
+      (a: { removedAt?: string | null }) => !a.removedAt
+    ),
+  });
 
   return (
     <div className="space-y-0 font-inter">
@@ -150,8 +151,15 @@ export function OrderDetailTabsClient({
                       ? new Date(order.submittedAt).toLocaleDateString()
                       : new Date(order.createdAt).toLocaleDateString()}
                   </span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusStyle.cls}`}>
-                    {statusStyle.label}
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 text-gray-600"
+                    style={
+                      statusDisplay.style
+                        ? { backgroundColor: statusDisplay.style.bg, color: statusDisplay.style.text }
+                        : undefined
+                    }
+                  >
+                    {statusDisplay.label}
                   </span>
                 </div>
               </div>
@@ -161,8 +169,9 @@ export function OrderDetailTabsClient({
             <div className="flex items-center gap-3">
               <StatusDropdown
                 orderId={order.id}
-                currentStatus={order.status as any}
+                currentStatus={order.status as OrderStatusKey}
                 adminId={adminId}
+                hasItinAddon={orderHasItin}
               />
             </div>
           </div>

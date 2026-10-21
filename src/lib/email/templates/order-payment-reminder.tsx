@@ -1,7 +1,7 @@
-// ─── Customer "Payment Pending" Reminder Email Template ──────────────────────
+// ─── Customer "Pending Payment" Reminder Email Template ──────────────────────
 // Sent from the LLC Registrations list when an admin triggers a reminder for
-// orders in the `payment_pending` status. The tone is a courteous reminder, not
-// a dunning notice — the work is complete and the balance is the last step.
+// orders in the `pending_payment` or `itin_payment_pending` status. The tone is
+// a courteous reminder, not a dunning notice — the work is complete and the balance is the last step.
 
 import { RESPONSIVE_EMAIL_STYLES } from './responsive'
 
@@ -89,7 +89,7 @@ export function PaymentReminderEmailHtml({
                 style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;overflow:hidden;">
                 <tr>
                   <td class="fm-pad-sm" style="padding:16px 24px;border-bottom:1px solid #fde68a;background:#fef3c7;">
-                    <p style="margin:0;font-size:11px;font-weight:700;color:#92400e;letter-spacing:0.12em;text-transform:uppercase;">Payment Pending</p>
+                    <p style="margin:0;font-size:11px;font-weight:700;color:#92400e;letter-spacing:0.12em;text-transform:uppercase;">Pending Payment</p>
                   </td>
                 </tr>
                 <tr>

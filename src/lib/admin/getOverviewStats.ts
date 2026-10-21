@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { OverviewStats, DateRangeFilter, DailyTrendPoint } from '@/types/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { isFormationCompleteStatus, isInProgressStatus } from '@/lib/orders/orderStatus';
 
 async function fetchOverviewStats(
   supabase: SupabaseClient<Database>,
@@ -43,8 +44,8 @@ async function fetchOverviewStats(
   llcOrders.forEach((o) => {
     const s = o.status as string;
     if (s === 'pending') llcPending++;
-    else if (s === 'initialized' || s === 'submitted_in_state' || s === 'ein_pending') llcInProgress++;
-    else if (s === 'formed') llcFormed++;
+    else if (isInProgressStatus(s)) llcInProgress++;
+    else if (isFormationCompleteStatus(s)) llcFormed++;
   });
 
   // 2. Revenue totals — LLC orders are now the only earnings source.

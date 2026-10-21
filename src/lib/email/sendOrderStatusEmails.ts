@@ -2,10 +2,11 @@
  * @file src/lib/email/sendOrderStatusEmails.ts
  * @description Customer-facing emails tied to LLC order status transitions.
  *
- * Three senders live here:
- *   • sendStateRegisteredEmail  — order moved to `ein_pending`
- *   • sendFormationCompleteEmail — order moved to `formed`
- *   • sendPaymentReminderEmail   — payment reminder for `payment_pending`
+ * `sendOrderStatusEmail` is the entry point for status changes: it picks the
+ * right email for the new status (see orderStatusEmailContent.ts for the full
+ * table). Two further senders are used directly:
+ *   • sendFormationCompleteEmail — `pending_payment` / `formation_completed`
+ *   • sendPaymentReminderEmail   — bulk reminder for the payment-pending statuses
  *
  * Every sender returns a result rather than throwing. A failed status email must
  * never roll back the status change that triggered it, and the bulk reminder
@@ -13,9 +14,11 @@
  */
 
 import { Resend } from 'resend'
-import { StateRegisteredEmailHtml } from './templates/order-state-registered'
 import { FormationCompleteEmailHtml } from './templates/order-formation-complete'
+import { OrderStatusUpdateEmailHtml } from './templates/order-status-update'
 import { PaymentReminderEmailHtml } from './templates/order-payment-reminder'
+import { GENERIC_STATUS_EMAILS, usesFormationCompleteTemplate } from './orderStatusEmailContent'
+import { TONE_STYLES, getStatusDisplay, type OrderStatusValue } from '@/lib/orders/orderStatus'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -47,12 +50,11 @@ interface BaseStatusEmailParams {
   formationState?: string
 }
 
-/** No extra fields beyond the shared set — state registration owes nothing. */
-export type StateRegisteredParams = BaseStatusEmailParams
-
 export interface FormationCompleteParams extends BaseStatusEmailParams {
   /** Outstanding balance in USD; 0 when nothing is owed. */
   pendingAmount?: number
+  /** Status named in the summary card; defaults to "Formation Completed". */
+  statusLabel?: string
 }
 
 export interface PaymentReminderParams extends BaseStatusEmailParams {
@@ -94,33 +96,9 @@ async function dispatch(
 }
 
 /**
- * State registration confirmed; federal EIN filing now under way.
- * Triggered when an order transitions to `ein_pending`.
- */
-export async function sendStateRegisteredEmail(
-  params: StateRegisteredParams
-): Promise<EmailResult> {
-  const { to, userName, orderNumber, businessName, formationState = '' } = params
-
-  return dispatch(
-    'State registered',
-    to,
-    'Your LLC Is Registered and Federal Filing Has Begun',
-    StateRegisteredEmailHtml({
-      userName,
-      orderNumber,
-      businessName,
-      formationState,
-      dashboardUrl: `${getAppUrl()}/dashboard`,
-      logoUrl: getLogoUrl(),
-    })
-  )
-}
-
-/**
- * EIN received and formation complete. When a balance remains the email leads
- * with the billing call to action.
- * Triggered when an order transitions to `formed`.
+ * EIN received. When a balance remains the email leads with the billing call to
+ * action. Triggered when an order moves to `pending_payment` (balance due) or
+ * `formation_completed`.
  */
 export async function sendFormationCompleteEmail(
   params: FormationCompleteParams
@@ -132,6 +110,7 @@ export async function sendFormationCompleteEmail(
     businessName,
     formationState = '',
     pendingAmount = 0,
+    statusLabel,
   } = params
 
   return dispatch(
@@ -146,6 +125,7 @@ export async function sendFormationCompleteEmail(
       businessName,
       formationState,
       pendingAmount,
+      statusLabel,
       billingUrl: `${getAppUrl()}/dashboard/billing`,
       dashboardUrl: `${getAppUrl()}/dashboard`,
       logoUrl: getLogoUrl(),
@@ -154,8 +134,56 @@ export async function sendFormationCompleteEmail(
 }
 
 /**
+ * Email the customer about an order's new status.
+ *
+ * Callers should check `hasStatusEmail(status)` first; a status with no email
+ * (Pending, which checkout already confirmed) returns a skipped result rather
+ * than throwing, so a mistaken call is harmless.
+ */
+export async function sendOrderStatusEmail(
+  status: OrderStatusValue,
+  params: FormationCompleteParams
+): Promise<EmailResult> {
+  const { label, tone } = getStatusDisplay(status)
+
+  if (usesFormationCompleteTemplate(status)) {
+    return sendFormationCompleteEmail({
+      ...params,
+      statusLabel: label,
+      // Formation Completed means nothing is outstanding, so it never leads
+      // with a balance even if one is still on the books.
+      pendingAmount: status === 'pending_payment' ? params.pendingAmount : 0,
+    })
+  }
+
+  const content = GENERIC_STATUS_EMAILS[status]
+  if (!content || !tone) {
+    return { ok: false, skipped: true, error: `No email defined for status "${status}"` }
+  }
+
+  return dispatch(
+    label,
+    params.to,
+    content.subject,
+    OrderStatusUpdateEmailHtml({
+      userName: params.userName,
+      orderNumber: params.orderNumber,
+      businessName: params.businessName,
+      formationState: params.formationState ?? '',
+      pendingAmount: params.pendingAmount ?? 0,
+      billingUrl: `${getAppUrl()}/dashboard/billing`,
+      dashboardUrl: `${getAppUrl()}/dashboard`,
+      logoUrl: getLogoUrl(),
+      statusLabel: label,
+      tone: TONE_STYLES[tone],
+      content,
+    })
+  )
+}
+
+/**
  * Courteous reminder that a balance is outstanding. Sent in bulk from the LLC
- * Registrations list for orders in `payment_pending`.
+ * Registrations list for orders in `pending_payment` or `itin_payment_pending`.
  */
 export async function sendPaymentReminderEmail(
   params: PaymentReminderParams

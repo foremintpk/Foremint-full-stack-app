@@ -3,6 +3,7 @@
 import React from 'react';
 import { LlcTopStats, LlcOrderStatus, LlcListFilters } from '@/types/admin';
 import { useLlcNavigation } from '@/context/llc-navigation-context';
+import { ORDER_STATUS_OPTIONS } from '@/lib/orders/orderStatus';
 
 interface LlcListTopStatsProps {
   stats: LlcTopStats;
@@ -29,21 +30,21 @@ export default function LlcListTopStats({
     return `/admin/llc-registrations?${params.toString()}`;
   };
 
-  const pills = [
-    { label: 'All',                value: stats.total,            key: 'all'                as const },
-    { label: 'Pending',            value: stats.pending,          key: 'pending'            as const },
-    { label: 'Initialized',        value: stats.initialized,      key: 'initialized'        as const },
-    { label: 'Submitted In State', value: stats.submittedInState, key: 'submitted_in_state' as const },
-    { label: 'EIN Pending',        value: stats.einPending,       key: 'ein_pending'        as const },
-    { label: 'Formed',             value: stats.formed,           key: 'formed'             as const },
-    { label: 'Payment Pending',    value: stats.paymentPending,   key: 'payment_pending'    as const },
+  // "All" first, then every selectable status in the shared presentation order.
+  const pills: { label: string; value: number; key: LlcOrderStatus | 'all' }[] = [
+    { label: 'All', value: stats.total, key: 'all' },
+    ...ORDER_STATUS_OPTIONS.map((opt) => ({
+      label: opt.label,
+      value: stats.byStatus[opt.value as keyof typeof stats.byStatus] ?? 0,
+      key: opt.value,
+    })),
   ];
 
   return (
     <div
       role="radiogroup"
       aria-label="Filter by order status"
-      className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible"
+      className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0 sm:overflow-visible sm:flex-wrap"
     >
       {pills.map((pill) => {
         const isActive = activeStatus === pill.key;
@@ -54,7 +55,7 @@ export default function LlcListTopStats({
             aria-checked={isActive}
             disabled={isPending}
             onClick={() => navigate(buildStatusUrl(pill.key))}
-            className={`flex items-center justify-between min-w-[120px] px-5 py-2.5 border rounded-full transition-all duration-200 shrink-0 disabled:opacity-70 disabled:cursor-not-allowed ${
+            className={`flex items-center justify-between min-w-[120px] px-4 py-2.5 border rounded-full transition-all duration-200 shrink-0 disabled:opacity-70 disabled:cursor-not-allowed ${
               isActive
                 ? 'bg-[#34088f] border-[#34088f] text-white shadow-sm'
                 : 'bg-white border-[#e5e7eb] hover:bg-[#fafafa] text-[#111111]'
