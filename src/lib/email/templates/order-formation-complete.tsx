@@ -1,7 +1,7 @@
 // ─── Customer "Formation Complete / EIN Received" Email Template ─────────────
-// Sent when an order moves to `formed`: the EIN letter has arrived and the
-// formation process is finished. Where a balance remains, the email asks the
-// customer to settle it and points them at the billing section.
+// Sent when an order moves to `pending_payment` (EIN arrived, balance due) or
+// `formation_completed` (everything finished). Where a balance remains, the
+// email asks the customer to settle it and points them at the billing section.
 
 import { RESPONSIVE_EMAIL_STYLES } from './responsive'
 
@@ -12,6 +12,8 @@ export interface FormationCompleteEmailProps {
   formationState: string
   /** Outstanding balance in USD. Pass 0 (or omit) when nothing is owed. */
   pendingAmount?: number
+  /** Status shown in the summary card. Defaults to "Formation Completed". */
+  statusLabel?: string
   /** Billing section of the customer dashboard. */
   billingUrl: string
   dashboardUrl: string
@@ -24,6 +26,7 @@ export function FormationCompleteEmailHtml({
   businessName,
   formationState,
   pendingAmount = 0,
+  statusLabel = 'Formation Completed',
   billingUrl,
   dashboardUrl,
   logoUrl,
@@ -118,13 +121,13 @@ export function FormationCompleteEmailHtml({
                       </tr>` : ''}
 
                       <tr>
-                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">Completed</td>
+                        <td style="font-size:13px;color:#9ca3af;padding:11px 0;border-bottom:1px solid #f3f4f6;">${hasBalance ? 'Updated' : 'Completed'}</td>
                         <td style="font-size:13px;font-weight:500;color:#374151;text-align:right;padding:11px 0;border-bottom:1px solid #f3f4f6;">${displayDate}</td>
                       </tr>
 
                       <tr>
                         <td style="font-size:14px;font-weight:700;color:#111827;padding:14px 0 6px;">Status</td>
-                        <td style="font-size:14px;font-weight:700;color:#10b981;text-align:right;padding:14px 0 6px;">Formed</td>
+                        <td style="font-size:14px;font-weight:700;color:${hasBalance ? '#e11d48' : '#10b981'};text-align:right;padding:14px 0 6px;">${statusLabel}</td>
                       </tr>
 
                     </table>

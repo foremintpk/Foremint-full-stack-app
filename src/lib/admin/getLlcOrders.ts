@@ -17,6 +17,7 @@ import { DATE_RANGES } from './dateRanges';
 import { formatLlcName } from './formatters';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { countByStatus } from '@/lib/orders/orderStatus';
 
 /**
  * Cap on client-profile matches folded into the order search. Each id adds ~37
@@ -204,23 +205,6 @@ async function fetchLlcOrders(
     }
 
     const statsRaw = statsData || [];
-    const statsTotal = statsRaw.length;
-    let pending = 0;
-    let initialized = 0;
-    let submittedInState = 0;
-    let einPending = 0;
-    let formed = 0;
-    let paymentPending = 0;
-
-    statsRaw.forEach((s) => {
-      const st = s.status;
-      if (st === 'pending') pending++;
-      else if (st === 'initialized') initialized++;
-      else if (st === 'submitted_in_state') submittedInState++;
-      else if (st === 'ein_pending') einPending++;
-      else if (st === 'formed') formed++;
-      else if (st === 'payment_pending') paymentPending++;
-    });
 
     return {
       orders,
@@ -228,13 +212,8 @@ async function fetchLlcOrders(
       totalPages,
       filters,
       stats: {
-        total: statsTotal,
-        pending,
-        initialized,
-        submittedInState,
-        einPending,
-        formed,
-        paymentPending,
+        total: statsRaw.length,
+        byStatus: countByStatus(statsRaw),
       },
     };
   };

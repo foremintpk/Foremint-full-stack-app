@@ -1,10 +1,6 @@
-export type OrderStatus =
-  | 'pending'
-  | 'initialized'
-  | 'submitted_in_state'
-  | 'ein_pending'
-  | 'formed'
-  | 'cancelled';
+import type { OrderStatusKey } from '@/lib/orders/orderStatus';
+
+export type OrderStatus = OrderStatusKey;
 
 export type PaymentStatus = 'unpaid' | 'paid' | 'failed' | 'refunded';
 export type PaymentMethod = 'bank_transfer' | 'already_paid' | 'card' | 'none';

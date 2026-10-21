@@ -6,6 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { getCoverage, TRACKED_CATEGORIES } from '@/lib/services/documents/orderBook';
+import { isDocumentsExpectedStatus } from '@/lib/orders/orderStatus';
 import { requireSs4Admin, Ss4ForbiddenError } from '@/lib/services/ss4/guard';
 
 export const runtime = 'nodejs';
@@ -20,7 +21,7 @@ export async function GET() {
     // Counts per category, restricted to orders far enough along that the
     // document is actually expected — a pending order has no Articles yet, and
     // counting it as "missing" would drown the real gaps.
-    const active = rows.filter((r) => r.status === 'formed' || r.status === 'ein_pending');
+    const active = rows.filter((r) => isDocumentsExpectedStatus(r.status));
     const missing = TRACKED_CATEGORIES.reduce(
       (acc, cat) => {
         acc[cat] = active.filter((r) => !r.has[cat]).length;

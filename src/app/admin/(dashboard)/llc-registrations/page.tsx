@@ -18,6 +18,7 @@ import LlcPagination from './_components/LlcPagination';
 import LlcContentArea from './_components/LlcContentArea';
 import { LlcNavigationProvider } from '@/context/llc-navigation-context';
 import { LlcListFilters, LlcOrderStatus, DateRangeFilter, LlcSortField, SortDirection } from '@/types/admin';
+import { isOrderStatus } from '@/lib/orders/orderStatus';
 
 // Rendered per request. A route-level `revalidate` caches the *rendered page*,
 // and revalidateTag() only clears the data caches underneath it — so a status
@@ -53,11 +54,8 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
 
  // Validate LLC Status
  let status: LlcOrderStatus | 'all' = 'all';
- if (
- resolvedParams.status &&
- ['pending', 'initialized', 'submitted_in_state', 'ein_pending', 'formed', 'payment_pending', 'cancelled'].includes(resolvedParams.status)
- ) {
- status = resolvedParams.status as LlcOrderStatus;
+ if (isOrderStatus(resolvedParams.status)) {
+ status = resolvedParams.status;
  }
 
  // Validate Date range filter
@@ -125,14 +123,15 @@ export default async function LlcRegistrationsPage({ searchParams }: PageProps) 
           </p>
         </div>
 
-        {/* Status filter pills — All / Pending / Processing / Formed */}
+        {/* Status filter pills — All plus every order status */}
         <LlcListTopStats stats={stats} activeStatus={status} filters={filters} />
 
         {/* Bulk reminder trigger — only meaningful while viewing the orders it
-            would email, so it appears with the Payment Pending filter. */}
-        {status === 'payment_pending' && stats.paymentPending > 0 && (
+            would email, so it appears with a payment-pending filter. */}
+        {(status === 'pending_payment' || status === 'itin_payment_pending') &&
+          stats.byStatus[status] > 0 && (
           <div className="flex justify-end">
-            <SendPaymentRemindersButton adminId={adminUser?.id ?? ''} />
+            <SendPaymentRemindersButton adminId={adminUser?.id ?? ''} status={status} />
           </div>
         )}
 

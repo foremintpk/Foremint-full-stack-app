@@ -5,10 +5,11 @@
  *
  * Shape of the feature
  * --------------------
- * The admin clicks "Send Payment Reminders" while the Payment Pending filter is
- * active. The client first calls `getPaymentPendingRecipients` to show a
- * confirmation dialog with the exact recipient list, then sends them one at a
- * time through `sendSinglePaymentReminder`, pausing 10–50 s between each.
+ * The admin clicks "Send Payment Reminders" while the Pending Payment or ITIN
+ * Payment Pending filter is active; only orders in that status are included.
+ * The client first calls `getPaymentPendingRecipients` to show a confirmation
+ * dialog with the exact recipient list, then sends them one at a time through
+ * `sendSinglePaymentReminder`, pausing 10–50 s between each.
  *
  * Why one recipient per call: a serverless function cannot stay alive for the
  * length of a staggered run (20 recipients averages ~10 minutes, well past
@@ -23,6 +24,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidateTag } from 'next/cache';
 import { sendPaymentReminderEmail } from '@/lib/email/sendOrderStatusEmails';
+import { readSnapshotBusinessName } from '@/lib/admin/formatters';
+import { PAYMENT_PENDING_STATUSES, type OrderStatusValue } from '@/lib/orders/orderStatus';
 
 export interface ReminderRecipient {
   orderId: string;
@@ -52,19 +55,26 @@ async function requireStaff(): Promise<
 }
 
 /**
- * Every order currently in `payment_pending`, with the contact details the
- * reminder needs and when each was last contacted.
+ * Every order currently in the given payment-pending status (`pending_payment`
+ * or `itin_payment_pending`), with the contact details the reminder needs and
+ * when each was last contacted.
  *
  * Read before sending so the confirmation dialog can state exactly who will be
  * emailed rather than only how many.
  */
-export async function getPaymentPendingRecipients(): Promise<{
+export async function getPaymentPendingRecipients(
+  status: OrderStatusValue = 'pending_payment'
+): Promise<{
   success: boolean;
   recipients?: ReminderRecipient[];
   error?: string;
 }> {
   const auth = await requireStaff();
   if (!auth.ok) return { success: false, error: auth.error };
+
+  if (!(PAYMENT_PENDING_STATUSES as readonly string[]).includes(status)) {
+    return { success: false, error: 'Reminders can only be sent for a payment-pending status' };
+  }
 
   try {
     const admin = createAdminClient();
@@ -74,7 +84,7 @@ export async function getPaymentPendingRecipients(): Promise<{
       .select(
         'id, order_number, form_snapshot, pending_amount_usd, grand_total, payment_status, profiles!orders_user_id_fkey(full_name, email)'
       )
-      .eq('status', 'payment_pending')
+      .eq('status', status)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -127,17 +137,12 @@ export async function getPaymentPendingRecipients(): Promise<{
       .map((row) => {
         const profile = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
         const p = (profile ?? {}) as Record<string, unknown>;
-        const snapshot =
-          row.form_snapshot && typeof row.form_snapshot === 'object'
-            ? (row.form_snapshot as Record<string, unknown>)
-            : {};
-
         return {
           orderId: row.id as string,
           orderNumber: (row.order_number as string) ?? (row.id as string).slice(0, 8),
           clientName: (p.full_name as string) ?? '',
           clientEmail: (p.email as string) ?? '',
-          businessName: typeof snapshot.businessName === 'string' ? snapshot.businessName : '',
+          businessName: readSnapshotBusinessName(row.form_snapshot),
           pendingAmount: (() => {
             const t = totalsByOrder.get(row.id as string);
             if (!t) {
@@ -154,7 +159,7 @@ export async function getPaymentPendingRecipients(): Promise<{
       // An order with no email on file cannot be reminded; drop it here so the
       // count in the dialog matches what will actually be sent.
       .filter((r) => r.clientEmail.length > 0)
-      // An order sitting in payment_pending whose entries show nothing due has
+      // An order sitting in a payment-pending status whose entries show nothing due has
       // been paid without the status being moved on. Chasing that customer for
       // money they already sent is the worst outcome of this whole flow, so it
       // is excluded regardless of what the stored column claims.
@@ -196,7 +201,7 @@ export async function sendSinglePaymentReminder(
     .single();
 
   const status = (current as Record<string, unknown> | null)?.status;
-  if (status !== 'payment_pending') {
+  if (typeof status !== 'string' || !(PAYMENT_PENDING_STATUSES as readonly string[]).includes(status)) {
     return { success: false, error: 'Order is no longer payment pending — skipped' };
   }
 

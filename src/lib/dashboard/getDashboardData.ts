@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatLlcName } from '../admin/formatters';
 import { computeBillingState } from './billing-utils';
+import { isFormationCompleteStatus } from '@/lib/orders/orderStatus';
 import { fetchCustomerNotifications } from './customerNotifications';
 import type {
   CustomerDashboardData,
@@ -157,7 +158,7 @@ async function fetchDashboardDataQuery(
     const company = companyId ? companiesMap[companyId] : null;
 
     let complianceState: CustomerLlcItem['complianceState'] = 'unknown';
-    if (o.status === 'formed') {
+    if (isFormationCompleteStatus(o.status)) {
       complianceState = 'compliant';
       if (company?.state_renewal_date) {
         const renewalDate = new Date(company.state_renewal_date);
@@ -302,7 +303,7 @@ async function fetchDashboardDataQuery(
   });
 
   const totalLlcs = llcs.length;
-  const activeLlcs = llcs.filter((l) => l.status === 'formed').length;
+  const activeLlcs = llcs.filter((l) => isFormationCompleteStatus(l.status)).length;
   const pendingActions = actions.filter((a) => a.priority === 'high').length;
   const pendingPayments = llcs.filter((l) => l.paymentStatus !== 'paid').length;
 

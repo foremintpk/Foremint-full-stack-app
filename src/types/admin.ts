@@ -8,6 +8,8 @@
  * 4. Revalidation / Cache Busting: N/A.
  */
 
+import type { OrderStatusKey, OrderStatusValue, StatusCounts } from '@/lib/orders/orderStatus'
+
 export type AdminRole = 'administrator' | 'manager' | 'account_manager'
 
 export interface AdminProfile {
@@ -149,7 +151,7 @@ export interface OverviewStats {
 
 // ─── LLC Registrations List ───────────────────────────────────────────────────
 
-export type LlcOrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending' | 'cancelled'
+export type LlcOrderStatus = OrderStatusKey
 export type PaymentStatus  = 'unpaid'  | 'paid'        | 'partial'
 export type SortDirection  = 'asc' | 'desc'
 export type LlcSortField   = 'created_at' | 'order_number' | 'grand_total'
@@ -171,12 +173,8 @@ export interface LlcOrderRow {
 
 export interface LlcTopStats {
   total: number
-  pending: number
-  initialized: number
-  submittedInState: number
-  einPending: number
-  formed: number
-  paymentPending: number
+  /** Orders per status; every selectable status is present, zero when none. */
+  byStatus: StatusCounts
 }
 
 export interface LlcListFilters {
@@ -199,7 +197,7 @@ export interface LlcListResult {
 
 // ─── Order Detail ─────────────────────────────────────────────────────────────
 
-export type OrderStatus = 'pending' | 'initialized' | 'submitted_in_state' | 'ein_pending' | 'formed' | 'payment_pending'
+export type OrderStatus = OrderStatusValue
 // Note: 'cancelled' exists in DB but is not selectable from the status dropdown UI
 
 export interface MemberIdDocEntry {

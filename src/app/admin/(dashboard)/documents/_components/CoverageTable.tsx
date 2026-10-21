@@ -13,6 +13,7 @@
 import React, { useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Minus, Search } from 'lucide-react';
 import type { OrderCoverage } from '@/lib/services/documents/orderBook';
+import { isDocumentsExpectedStatus } from '@/lib/orders/orderStatus';
 
 interface CoverageTableProps {
   rows: OrderCoverage[];
@@ -37,7 +38,7 @@ export default function CoverageTable({ rows, stats }: CoverageTableProps): Reac
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((r) => {
-      if (onlyActive && r.status !== 'formed' && r.status !== 'ein_pending') return false;
+      if (onlyActive && !isDocumentsExpectedStatus(r.status)) return false;
       if (onlyMissing && COLUMNS.every((c) => r.has[c.key])) return false;
       if (!q) return true;
       return (
@@ -95,7 +96,7 @@ export default function CoverageTable({ rows, stats }: CoverageTableProps): Reac
               onChange={(e) => setOnlyActive(e.target.checked)}
               className="w-3.5 h-3.5 accent-[#34088f] cursor-pointer"
             />
-            Formed / EIN-pending only
+            EIN Pending and later only
           </label>
         </div>
 

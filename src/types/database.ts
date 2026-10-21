@@ -1919,9 +1919,15 @@ export type Database = {
         | "pending"
         | "initialized"
         | "submitted_in_state"
+        | "formed_in_state"
         | "ein_pending"
-        | "formed"
-        | "payment_pending"
+        | "pending_payment"
+        | "formation_completed"
+        | "itin_initialized"
+        | "itin_in_progress"
+        | "itin_received"
+        | "itin_payment_pending"
+        | "itin_process_completed"
         | "cancelled"
       query_status: "open" | "in_progress" | "resolved" | "closed"
       storage_provider: "supabase" | "cloudinary"
@@ -2095,9 +2101,15 @@ export const Constants = {
         "pending",
         "initialized",
         "submitted_in_state",
+        "formed_in_state",
         "ein_pending",
-        "formed",
-        "payment_pending",
+        "pending_payment",
+        "formation_completed",
+        "itin_initialized",
+        "itin_in_progress",
+        "itin_received",
+        "itin_payment_pending",
+        "itin_process_completed",
         "cancelled",
       ],
       query_status: ["open", "in_progress", "resolved", "closed"],

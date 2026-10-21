@@ -62,7 +62,7 @@ export default async function AdminOverviewPage({ searchParams }: PageProps) {
           stats={[
             { label: 'Pending',     value: stats.llc.pending,    statusKey: 'pending' },
             { label: 'In Progress', value: stats.llc.inProgress, statusKey: 'inProgress' },
-            { label: 'Formed',      value: stats.llc.formed,     statusKey: 'formed' },
+            { label: 'Completed',   value: stats.llc.formed,     statusKey: 'formed' },
           ]}
         />
 

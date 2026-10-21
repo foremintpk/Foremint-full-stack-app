@@ -4,27 +4,26 @@ import React, { useState, useEffect } from 'react';
 import { Loader2, Check, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { updateOrderStatus } from '@/lib/admin/actions/updateOrderStatus';
-import { OrderStatus } from '@/types/admin';
+import {
+  GROUP_LABELS,
+  getSelectableStatuses,
+  getStatusDisplay,
+  type OrderStatusGroup,
+  type OrderStatusKey,
+} from '@/lib/orders/orderStatus';
 import { cn } from '@/lib/utils';
 
 interface StatusDropdownProps {
   orderId: string;
-  currentStatus: OrderStatus;
+  currentStatus: OrderStatusKey;
   adminId: string;
+  /** ITIN statuses are offered only for orders that bought the ITIN add-on. */
+  hasItinAddon: boolean;
 }
 
-const STATUS_OPTIONS: { value: OrderStatus; label: string; colorClass: string }[] = [
-  { value: 'pending',            label: 'Pending',            colorClass: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { value: 'initialized',        label: 'Initialized',        colorClass: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { value: 'submitted_in_state', label: 'Submitted In State', colorClass: 'bg-violet-100 text-violet-800 border-violet-200' },
-  { value: 'ein_pending',        label: 'EIN Pending',        colorClass: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { value: 'formed',             label: 'Formed',             colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  { value: 'payment_pending',    label: 'Payment Pending',    colorClass: 'bg-rose-50 text-rose-600 border-rose-200' },
-];
-
-export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdownProps): React.JSX.Element {
+export function StatusDropdown({ orderId, currentStatus, adminId, hasItinAddon }: StatusDropdownProps): React.JSX.Element {
   const router = useRouter();
-  const [status, setStatus] = useState<OrderStatus>(currentStatus);
+  const [status, setStatus] = useState<OrderStatusKey>(currentStatus);
   const [savingState, setSavingState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   useEffect(() => {
@@ -32,7 +31,7 @@ export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdo
   }, [currentStatus]);
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextStatus = e.target.value as OrderStatus;
+    const nextStatus = e.target.value as OrderStatusKey;
     const prevStatus = status;
 
     setStatus(nextStatus);
@@ -57,7 +56,15 @@ export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdo
     }
   };
 
-  const activeOption = STATUS_OPTIONS.find((o) => o.value === status) ?? STATUS_OPTIONS[0];
+  const options = getSelectableStatuses({ hasItin: hasItinAddon, current: status });
+  const groups = (['formation', 'itin'] as OrderStatusGroup[])
+    .map((group) => ({ group, items: options.filter((o) => o.group === group) }))
+    .filter((g) => g.items.length > 0);
+
+  // `cancelled` is not selectable, but an order that is cancelled must still
+  // read as cancelled here rather than falling back to the first option.
+  const isCancelled = status === 'cancelled';
+  const { style: toneStyle } = getStatusDisplay(status);
 
   return (
     <div className="flex items-center gap-2">
@@ -67,17 +74,36 @@ export function StatusDropdown({ orderId, currentStatus, adminId }: StatusDropdo
           onChange={handleChange}
           disabled={savingState === 'saving'}
           aria-label="Order status"
+          style={
+            toneStyle
+              ? { backgroundColor: toneStyle.bg, color: toneStyle.text, borderColor: toneStyle.border }
+              : undefined
+          }
           className={cn(
             'appearance-none pr-10 pl-4 py-1.5 text-xs font-semibold rounded-full border cursor-pointer focus:outline-none transition-all duration-200',
-            activeOption.colorClass,
             savingState === 'saving' && 'opacity-50 cursor-not-allowed'
           )}
         >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value} className="bg-white text-black font-semibold">
-              {opt.label}
+          {isCancelled && (
+            <option value="cancelled" disabled className="bg-white text-black font-semibold">
+              Cancelled
             </option>
-          ))}
+          )}
+          {groups.map(({ group, items }) => {
+            const rendered = items.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-white text-black font-semibold">
+                {opt.label}
+              </option>
+            ));
+            // The group headings only help when there is more than one group.
+            return groups.length > 1 ? (
+              <optgroup key={group} label={GROUP_LABELS[group]}>
+                {rendered}
+              </optgroup>
+            ) : (
+              <React.Fragment key={group}>{rendered}</React.Fragment>
+            );
+          })}
         </select>
         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5">
           <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
